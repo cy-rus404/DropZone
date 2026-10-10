@@ -2,9 +2,11 @@ const { app, BrowserWindow, ipcMain, screen, dialog, Tray, Menu, nativeImage } =
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const { execFile } = require('child_process');
 
 const isDev = process.env.NODE_ENV !== 'production';
 const TRANSFER_PORT = 54321;
+const BROADCAST_PORT = 54320;
 
 let mainWindow = null;
 let tray = null;
@@ -15,6 +17,32 @@ let transferService = null;
 const configPath = path.join(app.getPath('userData'), 'device.json');
 let deviceId = null;
 let deviceName = null;
+
+/**
+ * On Windows, silently add firewall rules for the discovery broadcast port and
+ * transfer port so Windows Defender doesn't block them. Runs once; failures are
+ * non-fatal (user may not have admin rights, rules may already exist).
+ */
+function ensureWindowsFirewallRules() {
+  if (process.platform !== 'win32') return;
+  const rules = [
+    ['DropZone-Discovery-In',  'Inbound',  'UDP', String(BROADCAST_PORT)],
+    ['DropZone-Discovery-Out', 'Outbound', 'UDP', String(BROADCAST_PORT)],
+    ['DropZone-Transfer-In',   'Inbound',  'TCP', String(TRANSFER_PORT)],
+    ['DropZone-Transfer-Out',  'Outbound', 'TCP', String(TRANSFER_PORT)],
+    ['DropZone-mDNS-In',       'Inbound',  'UDP', '5353'],
+  ];
+  for (const [name, dir, proto, port] of rules) {
+    execFile('netsh', [
+      'advfirewall', 'firewall', 'add', 'rule',
+      `name=${name}`, `dir=${dir.toLowerCase()}`, 'action=allow',
+      `protocol=${proto}`, `localport=${port}`,
+    ], (err) => {
+      if (err) console.warn(`[Firewall] Could not add rule "${name}": ${err.message}`);
+      else console.log(`[Firewall] Rule ensured: ${name}`);
+    });
+  }
+}
 
 function loadOrCreateDeviceId() {
   try {
@@ -183,6 +211,7 @@ ipcMain.on('resize-window', (event, { width, height }) => {
 
 app.whenReady().then(async () => {
   loadOrCreateDeviceId();
+  ensureWindowsFirewallRules();
   createMainWindow();
   createTray();
 

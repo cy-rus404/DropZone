@@ -2,24 +2,30 @@ const { EventEmitter } = require('events');
 const { Bonjour } = require('bonjour-service');
 const os = require('os');
 const dns = require('dns');
+const dgram = require('dgram');
 
 const SERVICE_TYPE = 'dropzone';
 const SERVICE_PROTOCOL = 'tcp';
-// Re-browse every 15 seconds to catch missed peers (especially on Windows)
-const REBROWSE_INTERVAL_MS = 15000;
+
+// UDP broadcast fallback settings
+const BROADCAST_PORT = 54320;          // separate UDP port for discovery beacons
+const BEACON_INTERVAL_MS = 5000;       // how often we broadcast our presence
+const REBROWSE_INTERVAL_MS = 15000;    // how often we restart mDNS browse on Windows
 
 /**
  * DiscoveryService
- * Advertises this device on the local network and discovers other DropZone instances.
+ * Dual-mode peer discovery:
+ *   1. mDNS via bonjour-service (works well on Mac/Linux)
+ *   2. UDP broadcast beacons (fallback for Windows where mDNS multicast is often blocked)
+ *
+ * Both modes are always active. A peer discovered by either method is added to the
+ * shared peers Map and emitted via 'peers-updated'.
+ *
+ * UDP Beacon format (JSON over UDP broadcast to 255.255.255.255:54320):
+ *   { type: 'dropzone-beacon', id, name, port, platform }
+ *
  * Emits:
  *   'peers-updated' → array of peer objects whenever the peer list changes
- *
- * Windows mDNS notes:
- *  - bonjour-service uses multicast-dns which can miss services on Windows due to
- *    network adapter/firewall issues. We mitigate this by stopping and restarting
- *    the browser on a periodic interval so fresh queries are sent.
- *  - Windows may return hostnames instead of IP addresses in service.addresses.
- *    We resolve hostnames to IPs via dns.lookup as a fallback.
  */
 class DiscoveryService extends EventEmitter {
   constructor(deviceId, deviceName, port) {
@@ -27,16 +33,22 @@ class DiscoveryService extends EventEmitter {
     this.deviceId = deviceId;
     this.deviceName = deviceName;
     this.port = port;
+
+    // mDNS
     this.bonjour = null;
     this.publishedService = null;
     this.browser = null;
-    this.peers = new Map(); // peerId → peer info
     this._rebrowseTimer = null;
+
+    // UDP broadcast
+    this.udpSocket = null;
+    this._beaconTimer = null;
+
+    this.peers = new Map(); // peerId → peer info
   }
 
-  /**
-   * Returns the primary non-internal IPv4 address for this machine.
-   */
+  // ─── Helpers ───────────────────────────────────────────────────────────────
+
   getLocalIP() {
     const interfaces = os.networkInterfaces();
     for (const name of Object.keys(interfaces)) {
@@ -49,96 +61,100 @@ class DiscoveryService extends EventEmitter {
     return '127.0.0.1';
   }
 
-  async start() {
-    this.bonjour = new Bonjour();
-
-    // Advertise this device
-    this.publishedService = this.bonjour.publish({
-      name: `${this.deviceName}__${this.deviceId}`,
-      type: SERVICE_TYPE,
-      protocol: SERVICE_PROTOCOL,
-      port: this.port,
-      txt: {
-        id: this.deviceId,
-        name: this.deviceName,
-        platform: process.platform,
-        version: '1.0.0',
-      },
+  async _resolveHost(host) {
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return host;
+    return new Promise((resolve) => {
+      dns.lookup(host, 4, (err, address) => {
+        resolve((!err && address) ? address : host);
+      });
     });
+  }
 
-    console.log(`[Discovery] Advertising as "${this.deviceName}" on port ${this.port}`);
+  // ─── Start / Stop ──────────────────────────────────────────────────────────
 
-    this._startBrowsing();
+  async start() {
+    this._startMDNS();
+    this._startUDPBeacon();
+  }
 
-    // On Windows, periodically re-browse to pick up peers that were missed
-    // due to multicast packet loss or firewall interference.
-    if (process.platform === 'win32') {
-      this._rebrowseTimer = setInterval(() => {
-        console.log('[Discovery] Re-browsing for peers (Windows periodic refresh)...');
-        this._stopBrowsing();
-        this._startBrowsing();
-      }, REBROWSE_INTERVAL_MS);
+  stop() {
+    console.log('[Discovery] Shutting down...');
+    this._stopMDNS();
+    this._stopUDPBeacon();
+  }
+
+  // ─── mDNS ──────────────────────────────────────────────────────────────────
+
+  _startMDNS() {
+    try {
+      this.bonjour = new Bonjour();
+
+      this.publishedService = this.bonjour.publish({
+        name: `${this.deviceName}__${this.deviceId}`,
+        type: SERVICE_TYPE,
+        protocol: SERVICE_PROTOCOL,
+        port: this.port,
+        txt: {
+          id: this.deviceId,
+          name: this.deviceName,
+          platform: process.platform,
+          version: '1.0.0',
+        },
+      });
+
+      console.log(`[Discovery] mDNS: advertising as "${this.deviceName}" on port ${this.port}`);
+      this._startBrowsing();
+
+      // On Windows, periodically restart the browser to re-query for missed peers
+      if (process.platform === 'win32') {
+        this._rebrowseTimer = setInterval(() => {
+          console.log('[Discovery] Re-browsing for peers (Windows periodic refresh)...');
+          this._stopBrowsing();
+          this._startBrowsing();
+        }, REBROWSE_INTERVAL_MS);
+      }
+    } catch (err) {
+      console.error('[Discovery] mDNS start error:', err.message);
+    }
+  }
+
+  _stopMDNS() {
+    if (this._rebrowseTimer) {
+      clearInterval(this._rebrowseTimer);
+      this._rebrowseTimer = null;
+    }
+    try {
+      this._stopBrowsing();
+      if (this.publishedService) { this.publishedService.stop(); this.publishedService = null; }
+      if (this.bonjour) { this.bonjour.destroy(); this.bonjour = null; }
+    } catch (err) {
+      console.error('[Discovery] mDNS stop error:', err.message);
     }
   }
 
   _startBrowsing() {
     if (!this.bonjour) return;
-
-    this.browser = this.bonjour.find({
-      type: SERVICE_TYPE,
-      protocol: SERVICE_PROTOCOL,
-    });
-
-    this.browser.on('up', (service) => {
-      this._onServiceUp(service);
-    });
-
-    this.browser.on('down', (service) => {
-      this._onServiceDown(service);
-    });
-
+    this.browser = this.bonjour.find({ type: SERVICE_TYPE, protocol: SERVICE_PROTOCOL });
+    this.browser.on('up', (s) => this._onServiceUp(s));
+    this.browser.on('down', (s) => this._onServiceDown(s));
     this.browser.start();
     console.log('[Discovery] Browsing for peers...');
   }
 
   _stopBrowsing() {
     if (this.browser) {
-      try {
-        this.browser.stop();
-      } catch (_) {}
+      try { this.browser.stop(); } catch (_) {}
       this.browser = null;
     }
-  }
-
-  async _resolveHost(host) {
-    // If it already looks like an IPv4 address, use it directly
-    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return host;
-
-    // Otherwise try to resolve the hostname to an IP
-    return new Promise((resolve) => {
-      dns.lookup(host, 4, (err, address) => {
-        if (err || !address) {
-          console.warn(`[Discovery] Could not resolve hostname "${host}": ${err?.message}`);
-          resolve(host); // fall back to original
-        } else {
-          resolve(address);
-        }
-      });
-    });
   }
 
   async _onServiceUp(service) {
     try {
       const txt = service.txt || {};
       const peerId = txt.id;
-
-      // Ignore ourselves
       if (!peerId || peerId === this.deviceId) return;
-
-      // Skip if we already know this peer (avoid duplicate emits)
       if (this.peers.has(peerId)) return;
 
-      // Prefer an explicit IPv4 address; fall back to hostname for DNS resolution
       let rawHost =
         (service.addresses && service.addresses.find((a) => /^\d{1,3}(\.\d{1,3}){3}$/.test(a))) ||
         (service.addresses && service.addresses[0]) ||
@@ -146,28 +162,21 @@ class DiscoveryService extends EventEmitter {
         service.referer?.address;
 
       if (!rawHost) {
-        console.warn('[Discovery] Service up but no host address:', service.name);
+        console.warn('[Discovery] mDNS service up but no address:', service.name);
         return;
       }
 
-      // Resolve hostname → IP (important on Windows)
       const host = await this._resolveHost(rawHost);
-
-      const peer = {
+      this._addPeer({
         id: peerId,
         name: txt.name || service.name,
         host,
         port: service.port,
         platform: txt.platform || 'unknown',
-        online: true,
-        discoveredAt: Date.now(),
-      };
-
-      this.peers.set(peerId, peer);
-      console.log(`[Discovery] Peer joined: ${peer.name} @ ${peer.host}:${peer.port}`);
-      this.emit('peers-updated', this.getPeers());
+        via: 'mdns',
+      });
     } catch (err) {
-      console.error('[Discovery] Error handling service up:', err);
+      console.error('[Discovery] mDNS service up error:', err);
     }
   }
 
@@ -175,45 +184,113 @@ class DiscoveryService extends EventEmitter {
     try {
       const txt = service.txt || {};
       const peerId = txt.id;
-
       if (!peerId || peerId === this.deviceId) return;
-
       if (this.peers.has(peerId)) {
-        const peer = this.peers.get(peerId);
-        console.log(`[Discovery] Peer left: ${peer.name}`);
+        console.log(`[Discovery] Peer left (mDNS): ${this.peers.get(peerId).name}`);
         this.peers.delete(peerId);
         this.emit('peers-updated', this.getPeers());
       }
     } catch (err) {
-      console.error('[Discovery] Error handling service down:', err);
+      console.error('[Discovery] mDNS service down error:', err);
     }
+  }
+
+  // ─── UDP Broadcast Beacon ──────────────────────────────────────────────────
+
+  _startUDPBeacon() {
+    try {
+      this.udpSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+
+      this.udpSocket.on('error', (err) => {
+        console.error('[Discovery] UDP socket error:', err.message);
+      });
+
+      this.udpSocket.on('message', (msg, rinfo) => {
+        this._onUDPMessage(msg, rinfo);
+      });
+
+      this.udpSocket.bind(BROADCAST_PORT, () => {
+        try {
+          this.udpSocket.setBroadcast(true);
+          console.log(`[Discovery] UDP beacon listening on port ${BROADCAST_PORT}`);
+          // Send an immediate beacon so peers that are already running see us right away
+          this._sendBeacon();
+        } catch (err) {
+          console.error('[Discovery] UDP bind setup error:', err.message);
+        }
+      });
+
+      // Broadcast our presence periodically
+      this._beaconTimer = setInterval(() => this._sendBeacon(), BEACON_INTERVAL_MS);
+    } catch (err) {
+      console.error('[Discovery] UDP beacon start error:', err.message);
+    }
+  }
+
+  _stopUDPBeacon() {
+    if (this._beaconTimer) {
+      clearInterval(this._beaconTimer);
+      this._beaconTimer = null;
+    }
+    if (this.udpSocket) {
+      try { this.udpSocket.close(); } catch (_) {}
+      this.udpSocket = null;
+    }
+  }
+
+  _sendBeacon() {
+    if (!this.udpSocket) return;
+    const beacon = Buffer.from(JSON.stringify({
+      type: 'dropzone-beacon',
+      id: this.deviceId,
+      name: this.deviceName,
+      port: this.port,
+      platform: process.platform,
+    }));
+
+    this.udpSocket.send(beacon, 0, beacon.length, BROADCAST_PORT, '255.255.255.255', (err) => {
+      if (err) console.error('[Discovery] UDP beacon send error:', err.message);
+    });
+  }
+
+  _onUDPMessage(msg, rinfo) {
+    try {
+      const data = JSON.parse(msg.toString('utf8'));
+      if (data.type !== 'dropzone-beacon') return;
+      if (!data.id || data.id === this.deviceId) return;
+      if (this.peers.has(data.id)) return;
+
+      // The sender's IP comes from the UDP packet source address (rinfo.address)
+      // This is more reliable than any address in the payload since it's the actual
+      // interface the packet arrived on.
+      this._addPeer({
+        id: data.id,
+        name: data.name,
+        host: rinfo.address,
+        port: data.port,
+        platform: data.platform || 'unknown',
+        via: 'udp',
+      });
+    } catch (_) {
+      // Ignore malformed packets
+    }
+  }
+
+  // ─── Shared peer management ────────────────────────────────────────────────
+
+  _addPeer(peer) {
+    const entry = {
+      ...peer,
+      online: true,
+      discoveredAt: Date.now(),
+    };
+    this.peers.set(peer.id, entry);
+    console.log(`[Discovery] Peer found (${peer.via}): ${peer.name} @ ${peer.host}:${peer.port}`);
+    this.emit('peers-updated', this.getPeers());
   }
 
   getPeers() {
     return Array.from(this.peers.values());
-  }
-
-  stop() {
-    console.log('[Discovery] Shutting down...');
-
-    if (this._rebrowseTimer) {
-      clearInterval(this._rebrowseTimer);
-      this._rebrowseTimer = null;
-    }
-
-    try {
-      this._stopBrowsing();
-      if (this.publishedService) {
-        this.publishedService.stop();
-        this.publishedService = null;
-      }
-      if (this.bonjour) {
-        this.bonjour.destroy();
-        this.bonjour = null;
-      }
-    } catch (err) {
-      console.error('[Discovery] Error during shutdown:', err);
-    }
   }
 }
 
