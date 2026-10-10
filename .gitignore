@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Production build
+build/
+dist/
+
+# Electron builder artifacts
+out/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Device config (generated at runtime)
+userData/
