@@ -66,7 +66,7 @@ class TransferService extends EventEmitter {
 
   // ─── Sending ───────────────────────────────────────────────────────────────
 
-  async sendFile(filePath, peerHost, peerPort, peerId, peerName) {
+  async sendFile(filePath, peerHost, peerPort, peerId, peerName, callerTransferId) {
     return new Promise((resolve, reject) => {
       if (!fs.existsSync(filePath)) {
         return reject(new Error('File not found: ' + filePath));
@@ -74,7 +74,8 @@ class TransferService extends EventEmitter {
 
       const stat = fs.statSync(filePath);
       const filename = path.basename(filePath);
-      const transferId = uuidv4();
+      // Use the caller-supplied ID so the renderer's UI entry matches progress/complete events
+      const transferId = callerTransferId || uuidv4();
 
       const socket = net.createConnection({ host: peerHost, port: peerPort }, () => {
         console.log(`[Transfer] Connected to ${peerName} @ ${peerHost}:${peerPort}`);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
+import { v4 as uuidv4 } from 'uuid';
 import DropNotch from './components/DropNotch';
 import DevicePicker from './components/DevicePicker';
 import IncomingPrompt from './components/IncomingPrompt';
@@ -143,7 +144,9 @@ export default function App() {
       setShowPicker(false);
       api.resizeWindow(420, 180);
 
-      const transferId = `send-${Date.now()}`;
+      // Generate the transferId here so the UI entry and IPC events share the same key
+      const transferId = uuidv4();
+
       setTransfers((prev) => ({
         ...prev,
         [transferId]: {
@@ -155,7 +158,7 @@ export default function App() {
         },
       }));
 
-      const result = await api.sendFile(droppedFile.path, peerId);
+      const result = await api.sendFile(droppedFile.path, peerId, transferId);
       if (!result.success) {
         addNotification(`❌ ${result.error}`);
         setTransfers((prev) => {
@@ -165,6 +168,7 @@ export default function App() {
         });
         api.resizeWindow(420, 110);
       }
+      // On success the transfer-complete event will clean up the entry
 
       setDroppedFile(null);
     },

@@ -141,13 +141,13 @@ ipcMain.handle('get-peers', () => {
 });
 
 // Renderer sends a file to a peer
-ipcMain.handle('send-file', async (event, { filePath, peerId }) => {
+ipcMain.handle('send-file', async (event, { filePath, peerId, transferId }) => {
   if (!transferService) return { success: false, error: 'Transfer service not ready' };
   try {
     const peers = discoveryService.getPeers();
     const peer = peers.find((p) => p.id === peerId);
     if (!peer) return { success: false, error: 'Peer not found' };
-    await transferService.sendFile(filePath, peer.host, peer.port, peer.id, peer.name);
+    await transferService.sendFile(filePath, peer.host, peer.port, peer.id, peer.name, transferId);
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };

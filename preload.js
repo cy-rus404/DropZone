@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('dropzone', {
   getPeers: () => ipcRenderer.invoke('get-peers'),
 
   // ── Actions ──────────────────────────────────────────────────────────────
-  sendFile: (filePath, peerId) => ipcRenderer.invoke('send-file', { filePath, peerId }),
+  sendFile: (filePath, peerId, transferId) => ipcRenderer.invoke('send-file', { filePath, peerId, transferId }),
   respondToTransfer: (transferId, accepted, savePath) =>
     ipcRenderer.invoke('respond-to-transfer', { transferId, accepted, savePath }),
   showSaveDialog: (filename) => ipcRenderer.invoke('show-save-dialog', { filename }),
