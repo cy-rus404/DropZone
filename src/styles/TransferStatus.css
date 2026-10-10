@@ -1,0 +1,111 @@
+/* ────────────────────────────────────────────────────────────
+   TransferStatus — Progress bars during active transfers
+──────────────────────────────────────────────────────────── */
+
+.transfer-status-container {
+  width: 420px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  border-top: none;
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: var(--shadow-glass);
+  padding: 8px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: -2px;
+}
+
+.transfer-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.transfer-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.transfer-direction {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+  flex-shrink: 0;
+}
+
+.transfer-direction.sending {
+  background: rgba(93, 224, 200, 0.12);
+  color: var(--accent-secondary);
+  border: 1px solid rgba(93, 224, 200, 0.25);
+}
+
+.transfer-direction.receiving {
+  background: rgba(124, 111, 247, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(124, 111, 247, 0.25);
+}
+
+.transfer-filename {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transfer-percent {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  min-width: 28px;
+  text-align: right;
+}
+
+/* Progress bar */
+.progress-track {
+  position: relative;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-secondary) 100%);
+  border-radius: 4px;
+}
+
+.progress-fill.complete {
+  background: linear-gradient(90deg, var(--success) 0%, #22d3ee 100%);
+}
+
+.progress-fill.error {
+  background: var(--error);
+}
+
+/* Shimmer animation on active transfers */
+.progress-shimmer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+}

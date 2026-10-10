@@ -1,0 +1,171 @@
+/* ────────────────────────────────────────────────────────────
+   DevicePicker — Slide-down panel for selecting a peer
+──────────────────────────────────────────────────────────── */
+
+.picker-overlay {
+  width: 420px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  border-top: none;
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  box-shadow: var(--shadow-glass);
+  overflow: hidden;
+  margin-top: -2px; /* flush under the notch */
+}
+
+.picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border-glass);
+}
+
+.picker-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.picker-icon {
+  font-size: 15px;
+}
+
+.picker-file-badge {
+  background: rgba(124, 111, 247, 0.15);
+  border: 1px solid rgba(124, 111, 247, 0.3);
+  border-radius: 20px;
+  padding: 2px 10px;
+  font-size: 10px;
+  color: var(--accent);
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-list {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.no-peers-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 16px;
+  gap: 6px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.no-peers-icon {
+  font-size: 28px;
+  margin-bottom: 4px;
+}
+
+.no-peers-message p {
+  font-size: 12px;
+}
+
+.no-peers-message .hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.peer-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-btn);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-glass);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.peer-item:hover {
+  background: rgba(124, 111, 247, 0.1);
+  border-color: rgba(124, 111, 247, 0.35);
+}
+
+.peer-avatar {
+  font-size: 22px;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 50%;
+  border: 1px solid var(--border-glass);
+}
+
+.peer-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.peer-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.peer-host {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.send-arrow {
+  font-size: 16px;
+  color: var(--accent);
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.picker-footer {
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--border-glass);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cancel-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-glass);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 16px;
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  font-family: var(--font);
+}
+
+.cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}

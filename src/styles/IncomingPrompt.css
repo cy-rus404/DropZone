@@ -1,0 +1,153 @@
+/* ────────────────────────────────────────────────────────────
+   IncomingPrompt — AirDrop-style accept/decline card
+──────────────────────────────────────────────────────────── */
+
+.incoming-overlay {
+  position: relative;
+  width: 420px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass-bright);
+  border-top: none;
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  box-shadow:
+    var(--shadow-glass),
+    0 0 0 1px rgba(124, 111, 247, 0.2),
+    0 0 32px rgba(124, 111, 247, 0.15);
+  overflow: hidden;
+  margin-top: -2px;
+}
+
+/* Pulsing attention ring */
+.pulse-ring {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--accent-glow);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.incoming-header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border-glass);
+}
+
+.incoming-icon {
+  font-size: 20px;
+}
+
+.incoming-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+
+.incoming-body {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sender-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.sender-name {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.wants-to-send {
+  margin-left: 3px;
+}
+
+/* File info card */
+.file-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-btn);
+}
+
+.file-card-icon {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.file-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.file-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-card-size {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Action buttons */
+.incoming-actions {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px 14px;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 9px 0;
+  border-radius: var(--radius-btn);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  font-family: var(--font);
+  transition: background 0.15s ease;
+}
+
+.decline-btn {
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  color: #f87171;
+}
+
+.decline-btn:hover {
+  background: rgba(248, 113, 113, 0.22);
+}
+
+.accept-btn {
+  background: linear-gradient(135deg, var(--accent) 0%, #6055e0 100%);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 16px rgba(124, 111, 247, 0.35);
+}
+
+.accept-btn:hover {
+  box-shadow: 0 4px 24px rgba(124, 111, 247, 0.55);
+}

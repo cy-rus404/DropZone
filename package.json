@@ -1,0 +1,62 @@
+{
+  "name": "dropzone",
+  "version": "1.0.0",
+  "description": "Drop it. Send it. Done. — Cross-platform local network file transfer",
+  "main": "main.js",
+  "scripts": {
+    "start": "concurrently \"npm run react-start\" \"wait-on http://localhost:3000 && electron .\"",
+    "react-start": "react-scripts start",
+    "react-build": "react-scripts build",
+    "build": "npm run react-build && electron-builder",
+    "electron": "electron .",
+    "dev": "concurrently \"cross-env BROWSER=none react-scripts start\" \"wait-on http://localhost:3000 && electron .\""
+  },
+  "keywords": ["file-transfer", "airdrop", "electron", "local-network"],
+  "author": "DropZone",
+  "license": "MIT",
+  "dependencies": {
+    "bonjour-service": "^1.1.1",
+    "framer-motion": "^10.16.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^27.0.0",
+    "electron-builder": "^24.6.4",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.dropzone.app",
+    "productName": "DropZone",
+    "files": [
+      "build/**/*",
+      "main.js",
+      "preload.js",
+      "src/services/**/*",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "buildResources": "assets"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    }
+  },
+  "browserslist": {
+    "production": [">0.2%", "not dead", "not op_mini all"],
+    "development": ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
+  }
+}

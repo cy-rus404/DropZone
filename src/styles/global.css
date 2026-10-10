@@ -1,0 +1,93 @@
+/* ────────────────────────────────────────────────────────────
+   DropZone — Global styles
+   Glassmorphism dark theme
+──────────────────────────────────────────────────────────── */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg-glass: rgba(18, 18, 24, 0.82);
+  --bg-glass-lighter: rgba(30, 30, 42, 0.75);
+  --border-glass: rgba(255, 255, 255, 0.08);
+  --border-glass-bright: rgba(255, 255, 255, 0.18);
+  --accent: #7c6ff7;
+  --accent-glow: rgba(124, 111, 247, 0.45);
+  --accent-secondary: #5de0c8;
+  --text-primary: rgba(255, 255, 255, 0.92);
+  --text-secondary: rgba(255, 255, 255, 0.48);
+  --text-muted: rgba(255, 255, 255, 0.28);
+  --success: #4ade80;
+  --error: #f87171;
+  --warning: #fbbf24;
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --radius-notch: 20px;
+  --radius-card: 14px;
+  --radius-btn: 10px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+.app-root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Toast notifications ─────────────────────────────────── */
+.notifications {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass-bright);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 20px;
+  box-shadow: var(--shadow-glass);
+  white-space: nowrap;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-glass-bright);
+  border-radius: 4px;
+}
