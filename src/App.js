@@ -1,46 +1,39 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { v4 as uuidv4 } from 'uuid';
+import { motion } from 'framer-motion';
 import DropNotch from './components/DropNotch';
-import DevicePicker from './components/DevicePicker';
 import IncomingPrompt from './components/IncomingPrompt';
-import TransferStatus from './components/TransferStatus';
 import './styles/global.css';
 
 const api = window.dropzone;
 
 export default function App() {
-  const [deviceInfo, setDeviceInfo] = useState(null);
-  const [peers, setPeers] = useState([]);
-  const [droppedFile, setDroppedFile] = useState(null);
-  const [showPicker, setShowPicker] = useState(false);
+  const [deviceInfo, setDeviceInfo]     = useState(null);
+  const [peers, setPeers]               = useState([]);
+  const [droppedFile, setDroppedFile]   = useState(null);
+  const [showPicker, setShowPicker]     = useState(false);
   const [incomingRequest, setIncomingRequest] = useState(null);
-  const [transfers, setTransfers] = useState({}); // transferId → status obj
-  const [notifications, setNotifications] = useState([]); // toast-style
+  const [transfers, setTransfers]       = useState({}); // transferId → status obj
+  const [notifications, setNotifications] = useState([]);
+  const [pingAlert, setPingAlert]       = useState(null); // incoming ping sender name
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       const info = await api.getDeviceInfo();
       setDeviceInfo(info);
-
       const initialPeers = await api.getPeers();
       setPeers(initialPeers);
     })();
 
-    // Live peer updates
-    api.onPeersUpdated((updatedPeers) => {
-      setPeers(updatedPeers);
-    });
+    api.onPeersUpdated((updatedPeers) => setPeers(updatedPeers));
 
-    // Incoming file request
     api.onIncomingTransfer((info) => {
       setIncomingRequest(info);
-      // Expand window for the prompt
       api.resizeWindow(420, 280);
     });
 
-    // Transfer progress
     api.onTransferProgress((progress) => {
       setTransfers((prev) => ({
         ...prev,
@@ -52,171 +45,143 @@ export default function App() {
       }));
     });
 
-    // Transfer complete
     api.onTransferComplete((info) => {
       setTransfers((prev) => ({
         ...prev,
         [info.transferId]: { ...prev[info.transferId], ...info, status: 'complete' },
       }));
-
       addNotification(
         info.direction === 'receiving'
           ? `✅ Received "${info.filename}"`
           : `✅ Sent "${info.filename}" successfully`
       );
-
-      // Clean up transfer entry after a delay
       setTimeout(() => {
-        setTransfers((prev) => {
-          const next = { ...prev };
-          delete next[info.transferId];
-          return next;
-        });
-      }, 4000);
-
-      // Collapse window back
-      api.resizeWindow(420, 110);
+        setTransfers((prev) => { const n = { ...prev }; delete n[info.transferId]; return n; });
+        api.resizeWindow(420, 110);
+      }, 3000);
     });
 
-    // Transfer error
     api.onTransferError((info) => {
       setTransfers((prev) => ({
         ...prev,
         [info.transferId]: { ...prev[info.transferId], ...info, status: 'error' },
       }));
-
       const msg = info.error === 'declined'
-        ? `❌ Transfer declined by receiver`
+        ? `❌ Transfer declined`
         : `❌ Transfer failed: ${info.error}`;
       addNotification(msg);
-
       setTimeout(() => {
-        setTransfers((prev) => {
-          const next = { ...prev };
-          delete next[info.transferId];
-          return next;
-        });
+        setTransfers((prev) => { const n = { ...prev }; delete n[info.transferId]; return n; });
         api.resizeWindow(420, 110);
-      }, 4000);
+      }, 3000);
+    });
+
+    // Incoming ping
+    api.onPingReceived((info) => {
+      setPingAlert(info.senderName);
+      api.playPingSound();
+      setTimeout(() => setPingAlert(null), 3500);
     });
 
     return () => {
       ['peers-updated', 'incoming-transfer-request', 'transfer-progress',
-       'transfer-complete', 'transfer-error'].forEach((ch) => api.removeAllListeners(ch));
+       'transfer-complete', 'transfer-error', 'ping-received']
+        .forEach((ch) => api.removeAllListeners(ch));
     };
   }, []);
 
-  // ── Window sizing based on app state ──────────────────────────────────────
+  // ── Window sizing ──────────────────────────────────────────────────────────
   useEffect(() => {
-    const hasActiveTransfer = Object.keys(transfers).length > 0;
-    if (hasActiveTransfer) {
-      api.resizeWindow(420, 180);
-    }
-  }, [transfers]);
+    const activeTransfers = Object.values(transfers);
+    const hasActive = activeTransfers.length > 0;
 
-  // ── Notifications helper ───────────────────────────────────────────────────
+    if (showPicker) {
+      const h = 64 + 16 + Math.min(peers.length, 4) * 56 + 52 + (peers.length === 0 ? 80 : 0);
+      api.resizeWindow(420, Math.max(h, 180));
+    } else if (hasActive) {
+      api.resizeWindow(420, 64 + activeTransfers.length * 62 + 16);
+    } else if (!incomingRequest) {
+      api.resizeWindow(420, 110);
+    }
+  }, [showPicker, transfers, peers.length, incomingRequest]);
+
+  // ── Notifications ──────────────────────────────────────────────────────────
   const addNotification = useCallback((message) => {
     const id = Date.now();
     setNotifications((prev) => [...prev, { id, message }]);
-    setTimeout(() => {
-      setNotifications((prev) => prev.filter((n) => n.id !== id));
-    }, 3500);
+    setTimeout(() => setNotifications((prev) => prev.filter((n) => n.id !== id)), 3500);
   }, []);
 
-  // ── File dropped on notch ──────────────────────────────────────────────────
-  const handleFileDrop = useCallback(
-    (file) => {
-      setDroppedFile(file);
-      if (peers.length === 0) {
-        addNotification('⚠️ No devices found on your network');
-        return;
-      }
-      setShowPicker(true);
-      api.resizeWindow(420, 360);
-    },
-    [peers, addNotification]
-  );
-
-  // ── User picked a device ───────────────────────────────────────────────────
-  const handleSendTo = useCallback(
-    async (peerId) => {
-      if (!droppedFile) return;
-      setShowPicker(false);
-      api.resizeWindow(420, 180);
-
-      // Generate the transferId here so the UI entry and IPC events share the same key
-      const transferId = uuidv4();
-
-      setTransfers((prev) => ({
-        ...prev,
-        [transferId]: {
-          transferId,
-          filename: droppedFile.name,
-          status: 'sending',
-          direction: 'sending',
-          percent: 0,
-        },
-      }));
-
-      const result = await api.sendFile(droppedFile.path, peerId, transferId);
-      if (!result.success) {
-        addNotification(`❌ ${result.error}`);
-        setTransfers((prev) => {
-          const next = { ...prev };
-          delete next[transferId];
-          return next;
-        });
-        api.resizeWindow(420, 110);
-      }
-      // On success the transfer-complete event will clean up the entry
-
-      setDroppedFile(null);
-    },
-    [droppedFile, addNotification]
-  );
-
-  // ── User cancelled device picker ───────────────────────────────────────────
-  const handlePickerClose = useCallback(() => {
-    setShowPicker(false);
-    setDroppedFile(null);
-    api.resizeWindow(420, 110);
-  }, []);
-
-  // ── Incoming file: Accept ──────────────────────────────────────────────────
-  const handleAccept = useCallback(async () => {
-    if (!incomingRequest) return;
-    const { transferId, filename } = incomingRequest;
-
-    const result = await api.showSaveDialog(filename);
-    if (result.canceled) {
-      api.respondToTransfer(transferId, false, null);
-      setIncomingRequest(null);
-      api.resizeWindow(420, 110);
+  // ── File drop ──────────────────────────────────────────────────────────────
+  const handleFileDrop = useCallback((file) => {
+    setDroppedFile(file);
+    if (peers.length === 0) {
+      addNotification('⚠️ No devices found on your network');
       return;
     }
+    setShowPicker(true);
+  }, [peers, addNotification]);
 
-    api.respondToTransfer(transferId, true, result.filePath);
+  // ── Send to peer ───────────────────────────────────────────────────────────
+  const handleSendTo = useCallback(async (peerId) => {
+    if (!droppedFile) return;
+    setShowPicker(false);
 
+    const transferId = uuidv4();
     setTransfers((prev) => ({
       ...prev,
       [transferId]: {
         transferId,
-        filename,
-        status: 'receiving',
-        direction: 'receiving',
+        filename: droppedFile.name,
+        status: 'sending',
+        direction: 'sending',
         percent: 0,
       },
     }));
 
+    const result = await api.sendFile(droppedFile.path, peerId, transferId);
+    if (!result.success) {
+      addNotification(`❌ ${result.error}`);
+      setTransfers((prev) => { const n = { ...prev }; delete n[transferId]; return n; });
+    }
+    setDroppedFile(null);
+  }, [droppedFile, addNotification]);
+
+  // ── Cancel picker ──────────────────────────────────────────────────────────
+  const handlePickerClose = useCallback(() => {
+    setShowPicker(false);
+    setDroppedFile(null);
+  }, []);
+
+  // ── Ping ───────────────────────────────────────────────────────────────────
+  const handlePing = useCallback((peerId) => {
+    api.sendPing(peerId);
+    addNotification('🔔 Ping sent!');
+  }, [addNotification]);
+
+  // ── Accept incoming ────────────────────────────────────────────────────────
+  const handleAccept = useCallback(async () => {
+    if (!incomingRequest) return;
+    const { transferId, filename } = incomingRequest;
+    const result = await api.showSaveDialog(filename);
+    if (result.canceled) {
+      api.respondToTransfer(transferId, false, null);
+      setIncomingRequest(null);
+      return;
+    }
+    api.respondToTransfer(transferId, true, result.filePath);
+    setTransfers((prev) => ({
+      ...prev,
+      [transferId]: { transferId, filename, status: 'receiving', direction: 'receiving', percent: 0 },
+    }));
     setIncomingRequest(null);
   }, [incomingRequest]);
 
-  // ── Incoming file: Decline ─────────────────────────────────────────────────
+  // ── Decline incoming ───────────────────────────────────────────────────────
   const handleDecline = useCallback(() => {
     if (!incomingRequest) return;
     api.respondToTransfer(incomingRequest.transferId, false, null);
     setIncomingRequest(null);
-    api.resizeWindow(420, 110);
     addNotification('Transfer declined');
   }, [incomingRequest, addNotification]);
 
@@ -224,28 +189,19 @@ export default function App() {
 
   return (
     <div className="app-root">
-      {/* Main floating notch */}
       <DropNotch
         deviceName={deviceInfo?.name}
-        peerCount={peers.length}
-        onFileDrop={handleFileDrop}
-        isExpanded={showPicker || activeTransfers.length > 0}
+        peers={peers}
         droppedFile={droppedFile}
+        onFileDrop={handleFileDrop}
+        onSendTo={handleSendTo}
+        onCancelPicker={handlePickerClose}
+        onPing={handlePing}
+        transfers={activeTransfers}
+        showPicker={showPicker}
       />
 
-      {/* Device picker overlay */}
-      <AnimatePresence>
-        {showPicker && (
-          <DevicePicker
-            peers={peers}
-            droppedFile={droppedFile}
-            onSend={handleSendTo}
-            onClose={handlePickerClose}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Incoming transfer prompt */}
+      {/* Incoming transfer prompt — separate card, appears below notch */}
       <AnimatePresence>
         {incomingRequest && (
           <IncomingPrompt
@@ -256,11 +212,9 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Active transfer progress bars */}
+      {/* Ping alert */}
       <AnimatePresence>
-        {activeTransfers.length > 0 && (
-          <TransferStatus transfers={activeTransfers} />
-        )}
+        {pingAlert && <PingAlert name={pingAlert} />}
       </AnimatePresence>
 
       {/* Toast notifications */}
@@ -275,19 +229,31 @@ export default function App() {
   );
 }
 
-// ── Inline Notification component ────────────────────────────────────────────
-import { motion } from 'framer-motion';
-
 function Notification({ message }) {
   return (
-    <motion.div
-      className="toast"
+    <motion.div className="toast"
       initial={{ opacity: 0, y: -10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -10, scale: 0.95 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-    >
+      transition={{ type: 'spring', stiffness: 400, damping: 30 }}>
       {message}
+    </motion.div>
+  );
+}
+
+function PingAlert({ name }) {
+  return (
+    <motion.div className="ping-alert"
+      initial={{ opacity: 0, scale: 0.8, y: -10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.8, y: -10 }}
+      transition={{ type: 'spring', stiffness: 500, damping: 32 }}>
+      <motion.span
+        animate={{ rotate: [0, -25, 25, -15, 15, -8, 8, 0] }}
+        transition={{ duration: 0.7, repeat: 2 }}
+        style={{ display: 'inline-block' }}
+      >🔔</motion.span>
+      <span><strong>{name}</strong> is pinging you!</span>
     </motion.div>
   );
 }

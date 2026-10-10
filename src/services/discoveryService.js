@@ -256,24 +256,45 @@ class DiscoveryService extends EventEmitter {
   _onUDPMessage(msg, rinfo) {
     try {
       const data = JSON.parse(msg.toString('utf8'));
-      if (data.type !== 'dropzone-beacon') return;
-      if (!data.id || data.id === this.deviceId) return;
-      if (this.peers.has(data.id)) return;
-
-      // The sender's IP comes from the UDP packet source address (rinfo.address)
-      // This is more reliable than any address in the payload since it's the actual
-      // interface the packet arrived on.
-      this._addPeer({
-        id: data.id,
-        name: data.name,
-        host: rinfo.address,
-        port: data.port,
-        platform: data.platform || 'unknown',
-        via: 'udp',
-      });
+      if (data.type === 'dropzone-beacon') {
+        if (!data.id || data.id === this.deviceId) return;
+        if (this.peers.has(data.id)) return;
+        this._addPeer({
+          id: data.id,
+          name: data.name,
+          host: rinfo.address,
+          port: data.port,
+          platform: data.platform || 'unknown',
+          via: 'udp',
+        });
+      } else if (data.type === 'dropzone-ping') {
+        if (data.targetId !== this.deviceId) return;
+        console.log(`[Discovery] Ping received from ${data.senderName}`);
+        this.emit('ping-received', { senderId: data.senderId, senderName: data.senderName });
+      }
     } catch (_) {
       // Ignore malformed packets
     }
+  }
+
+  /**
+   * Send a ping UDP packet directly to a known peer.
+   */
+  sendPing(peerId) {
+    const peer = this.peers.get(peerId);
+    if (!peer || !this.udpSocket) return;
+
+    const packet = Buffer.from(JSON.stringify({
+      type: 'dropzone-ping',
+      senderId: this.deviceId,
+      senderName: this.deviceName,
+      targetId: peerId,
+    }));
+
+    this.udpSocket.send(packet, 0, packet.length, BROADCAST_PORT, peer.host, (err) => {
+      if (err) console.error('[Discovery] Ping send error:', err.message);
+      else console.log(`[Discovery] Ping sent to ${peer.name} @ ${peer.host}`);
+    });
   }
 
   // ─── Shared peer management ────────────────────────────────────────────────

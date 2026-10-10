@@ -1,62 +1,61 @@
-/* ────────────────────────────────────────────────────────────
-   DropNotch — Floating pill at top of screen
-──────────────────────────────────────────────────────────── */
+/* ──────────────────────────────────────────────────────────
+   DropNotch — Unified Apple-notch-style pill
+   Everything lives inside one shape. No cards underneath.
+────────────────────────────────────────────────────────── */
 
-.notch-container {
+.notch {
   position: relative;
   width: 420px;
-  height: 64px;
-  background: var(--bg-glass);
-  border: 1px solid var(--border-glass);
+  min-height: 64px;
+  background: rgba(10, 10, 14, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-top: none;
-  border-radius: 0 0 var(--radius-notch) var(--radius-notch);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: var(--shadow-glass);
-  overflow: visible;
-  cursor: default;
-  transition: border-color 0.2s ease;
-  -webkit-app-region: drag; /* makes the notch draggable */
-}
-
-.notch-container.drag-over {
-  border-color: var(--accent);
+  border-radius: 0 0 22px 22px;
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
   box-shadow:
-    var(--shadow-glass),
-    0 0 0 1px var(--accent),
-    0 0 24px var(--accent-glow);
+    0 8px 40px rgba(0, 0, 0, 0.55),
+    0 2px 8px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  cursor: default;
+  -webkit-app-region: drag;
 }
 
-/* Prevent buttons/interactive els inside from being draggable */
-.notch-container * {
+.notch * {
   -webkit-app-region: no-drag;
 }
 
-/* Glow ring that appears on drag-over */
-.drag-glow {
+.notch.drag-over {
+  border-color: var(--accent);
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.55),
+    0 0 0 1px var(--accent),
+    0 0 28px var(--accent-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Glow that bleeds out on drag */
+.notch-glow {
   position: absolute;
-  inset: -1px;
-  border-radius: 0 0 var(--radius-notch) var(--radius-notch);
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    var(--accent-glow) 100%
-  );
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, var(--accent-glow) 0%, transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
 
-.notch-inner {
+/* ── Top bar — always visible ───────────────────────────── */
+.notch-bar {
   position: relative;
   z-index: 1;
   display: flex;
   align-items: center;
-  height: 100%;
+  height: 64px;
   padding: 0 14px;
   gap: 10px;
+  flex-shrink: 0;
 }
 
-/* ── Left: logo + name ────────────────────────────── */
 .notch-left {
   display: flex;
   align-items: center;
@@ -64,7 +63,7 @@
   flex-shrink: 0;
 }
 
-.logo-mark {
+.logo {
   font-size: 22px;
   line-height: 1;
   filter: drop-shadow(0 0 6px var(--accent-glow));
@@ -86,13 +85,12 @@
 .device-name {
   font-size: 10px;
   color: var(--text-muted);
-  max-width: 90px;
+  max-width: 100px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* ── Center: drop hint ────────────────────────────── */
 .notch-center {
   flex: 1;
   display: flex;
@@ -101,53 +99,59 @@
   min-width: 0;
 }
 
-.drop-hint {
+.hint-idle {
   font-size: 11px;
   color: var(--text-muted);
-  letter-spacing: 0.2px;
-  pointer-events: none;
 }
 
-.drop-hint.active {
-  color: var(--accent);
+.hint-muted {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.38);
+  font-style: italic;
+}
+
+.hint-active {
+  font-size: 12px;
   font-weight: 600;
-  filter: drop-shadow(0 0 6px var(--accent-glow));
+  color: var(--accent);
+  filter: drop-shadow(0 0 8px var(--accent-glow));
 }
 
-.dropped-file-info {
+/* Dropped file pill in center */
+.file-pill {
   display: flex;
   align-items: center;
-  gap: 7px;
-  max-width: 160px;
+  gap: 6px;
+  background: rgba(124, 111, 247, 0.12);
+  border: 1px solid rgba(124, 111, 247, 0.28);
+  border-radius: 20px;
+  padding: 4px 10px 4px 6px;
+  max-width: 190px;
 }
 
-.file-icon {
-  font-size: 18px;
+.file-pill-icon {
+  font-size: 16px;
   flex-shrink: 0;
 }
 
-.file-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.file-name {
+.file-pill-name {
   font-size: 11px;
   font-weight: 600;
   color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
-.file-size {
+.file-pill-size {
   font-size: 10px;
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
-/* ── Right: peer badge ────────────────────────────── */
+/* Peer badge */
 .notch-right {
   flex-shrink: 0;
 }
@@ -159,19 +163,19 @@
   gap: 1px;
   padding: 4px 10px;
   border-radius: 20px;
-  border: 1px solid var(--border-glass);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   background: rgba(255, 255, 255, 0.04);
 }
 
 .peer-badge.has-peers {
-  border-color: var(--accent-secondary);
+  border-color: rgba(93, 224, 200, 0.3);
   background: rgba(93, 224, 200, 0.08);
 }
 
 .peer-count {
   font-size: 14px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--text-secondary);
   line-height: 1;
 }
 
@@ -186,18 +190,256 @@
   letter-spacing: 0.5px;
 }
 
-/* ── Animated drop border sweep ───────────────────── */
-.border-sweep {
-  position: absolute;
-  inset: 0;
-  border-radius: 0 0 var(--radius-notch) var(--radius-notch);
-  border: 2px dashed var(--accent);
-  pointer-events: none;
-  opacity: 0.6;
-  animation: dash-rotate 1s linear infinite;
+/* ── Expanded content area ──────────────────────────────── */
+.notch-expanded {
+  position: relative;
+  z-index: 1;
 }
 
-@keyframes dash-rotate {
-  from { stroke-dashoffset: 0; }
-  to { stroke-dashoffset: 100; }
+.divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.07);
+  margin: 0 14px;
+}
+
+/* ── Device Picker ──────────────────────────────────────── */
+.peer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+}
+
+.peer-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.peer-send-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  cursor: pointer;
+  color: inherit;
+  font-family: var(--font);
+  text-align: left;
+  transition: background 0.12s ease, border-color 0.12s ease;
+  min-width: 0;
+}
+
+.peer-send-btn:hover {
+  background: rgba(124, 111, 247, 0.1);
+  border-color: rgba(124, 111, 247, 0.3);
+}
+
+.peer-avatar {
+  font-size: 20px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.peer-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.peer-ip {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  flex-shrink: 0;
+}
+
+.send-chevron {
+  font-size: 14px;
+  color: var(--accent);
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+/* Ping button */
+.ping-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  cursor: pointer;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.ping-btn:hover {
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+.ping-btn.pinging {
+  background: rgba(251, 191, 36, 0.18);
+  border-color: rgba(251, 191, 36, 0.5);
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
+}
+
+/* No peers message */
+.no-peers {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 18px;
+  gap: 5px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.no-peers-icon {
+  font-size: 28px;
+  margin-bottom: 4px;
+}
+
+.no-peers p {
+  font-size: 12px;
+}
+
+.no-peers-hint {
+  font-size: 11px;
+  color: var(--text-muted) !important;
+}
+
+/* Footer */
+.picker-footer {
+  padding: 8px 10px 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cancel-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: background 0.12s ease;
+}
+
+.cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+/* ── Transfer progress rows ─────────────────────────────── */
+.transfer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px 12px;
+}
+
+.transfer-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.transfer-row-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.xfr-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+  flex-shrink: 0;
+}
+
+.xfr-badge.send {
+  background: rgba(93, 224, 200, 0.12);
+  color: var(--accent-secondary);
+  border: 1px solid rgba(93, 224, 200, 0.25);
+}
+
+.xfr-badge.recv {
+  background: rgba(124, 111, 247, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(124, 111, 247, 0.25);
+}
+
+.xfr-name {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.xfr-pct {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  min-width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.xfr-track {
+  position: relative;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.xfr-fill {
+  position: absolute;
+  top: 0; left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-secondary) 100%);
+  border-radius: 4px;
+}
+
+.xfr-fill.done {
+  background: linear-gradient(90deg, var(--success) 0%, #22d3ee 100%);
+}
+
+.xfr-fill.err {
+  background: var(--error);
+}
+
+.xfr-shimmer {
+  position: absolute;
+  top: 0; left: 0;
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%);
+  pointer-events: none;
 }

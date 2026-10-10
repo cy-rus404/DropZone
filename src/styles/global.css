@@ -80,6 +80,25 @@ body,
   white-space: nowrap;
 }
 
+/* ── Ping alert ─────────────────────────────────────────── */
+.ping-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(18, 18, 24, 0.92);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 9px 16px;
+  border-radius: 20px;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.2), var(--shadow-glass);
+  white-space: nowrap;
+  margin-top: 6px;
+}
+
 /* ── Scrollbar ───────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 4px;

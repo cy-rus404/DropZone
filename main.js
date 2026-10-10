@@ -207,6 +207,21 @@ ipcMain.on('resize-window', (event, { width, height }) => {
   }
 });
 
+// Send a ping to a peer
+ipcMain.handle('send-ping', async (event, { peerId }) => {
+  if (discoveryService) discoveryService.sendPing(peerId);
+});
+
+// Play the ping sound on the receiver side
+ipcMain.on('play-ping-sound', () => {
+  // Use the shell to play a system sound cross-platform
+  if (process.platform === 'darwin') {
+    require('child_process').exec('afplay /System/Library/Sounds/Ping.aiff');
+  } else if (process.platform === 'win32') {
+    require('child_process').exec('powershell -c "[console]::beep(880,300)"');
+  }
+});
+
 // ─── App Lifecycle ────────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
@@ -250,8 +265,14 @@ app.whenReady().then(async () => {
   });
 
   discoveryService.on('peers-updated', (peers) => {
+    if (mainWindow) mainWindow.webContents.send('peers-updated', peers);
+  });
+
+  discoveryService.on('ping-received', (info) => {
     if (mainWindow) {
-      mainWindow.webContents.send('peers-updated', peers);
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.send('ping-received', info);
     }
   });
 

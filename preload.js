@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('dropzone', {
     ipcRenderer.invoke('respond-to-transfer', { transferId, accepted, savePath }),
   showSaveDialog: (filename) => ipcRenderer.invoke('show-save-dialog', { filename }),
   resizeWindow: (width, height) => ipcRenderer.send('resize-window', { width, height }),
+  sendPing: (peerId) => ipcRenderer.invoke('send-ping', { peerId }),
+  playPingSound: () => ipcRenderer.send('play-ping-sound'),
 
   // ── Event listeners ──────────────────────────────────────────────────────
   onPeersUpdated: (callback) => {
@@ -31,6 +33,9 @@ contextBridge.exposeInMainWorld('dropzone', {
   },
   onTransferError: (callback) => {
     ipcRenderer.on('transfer-error', (_, info) => callback(info));
+  },
+  onPingReceived: (callback) => {
+    ipcRenderer.on('ping-received', (_, info) => callback(info));
   },
 
   // ── Cleanup ──────────────────────────────────────────────────────────────
