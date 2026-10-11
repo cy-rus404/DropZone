@@ -48,6 +48,7 @@ export default function DropNotch({
   settingsContent,
   showPin,
   pinContent,
+  pinStep,
   onHoverChange,
   onOpenSettings,
 }) {
@@ -232,7 +233,7 @@ export default function DropNotch({
                 ) : showPin ? (
                   <motion.span key="pin" className="hint-dim"
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    Enter PIN
+                    {pinStep === 'enter' ? 'Enter PIN' : 'PIN Required'}
                   </motion.span>
                 ) : showPicker ? (
                   <motion.span key="pick" className="hint-dim"

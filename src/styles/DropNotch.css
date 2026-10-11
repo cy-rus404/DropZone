@@ -550,3 +550,23 @@
   background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.32) 50%, transparent 100%);
   pointer-events: none;
 }
+
+/* ── PIN share prompt (first step — sender chooses to share or decline) ── */
+.pin-share-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.45;
+  margin: 0;
+  padding: 0 4px;
+}
+
+.pin-share-hint strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.pin-share-actions {
+  justify-content: center;
+  margin-top: 4px;
+}

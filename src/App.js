@@ -27,7 +27,8 @@ export default function App() {
   const [currentPin, setCurrentPin]   = useState(null);
 
   // PIN entry dialog (sender side)
-  const [pinChallenge, setPinChallenge] = useState(null); // { transferId }
+  const [pinChallenge, setPinChallenge] = useState(null); // { transferId, receiverName? }
+  const [pinChallengeStep, setPinChallengeStep] = useState('prompt'); // 'prompt' | 'enter'
   const [pinInput, setPinInput]         = useState('');
   const [pinError, setPinError]         = useState(false);
 
@@ -89,6 +90,7 @@ export default function App() {
       // Clear PIN challenge if the error is PIN-related
       if (info.error === 'wrong-pin' || info.error === 'pin-timeout') {
         setPinChallenge(null);
+        setPinChallengeStep('prompt');
         setPinInput('');
         if (info.error === 'wrong-pin') setPinError(true);
       }
@@ -109,9 +111,10 @@ export default function App() {
       setTimeout(() => setPingAlert(null), 4000);
     });
 
-    // Receiver requires a PIN — show PIN entry to the sender
+    // Receiver requires a PIN — show share/decline prompt to the sender first
     api.onPinRequired((info) => {
       setPinChallenge({ transferId: info.transferId });
+      setPinChallengeStep('prompt');
       setPinInput('');
       setPinError(false);
       api.resizeWindow(400, 52 + 1 + 148 + 12);
@@ -206,11 +209,13 @@ export default function App() {
     if (!droppedFile) return;
     setShowPicker(false);
     const transferId = uuidv4();
+    const peer = peers.find((p) => p.id === peerId);
     setTransfers((prev) => ({
       ...prev,
       [transferId]: {
         transferId,
         filename: droppedFile.name,
+        peerName: peer?.name || 'the receiver',
         status: 'sending',
         direction: 'sending',
         percent: 0,
@@ -222,7 +227,7 @@ export default function App() {
       setTransfers((prev) => { const n = { ...prev }; delete n[transferId]; return n; });
     }
     setDroppedFile(null);
-  }, [droppedFile, addNotification]);
+  }, [droppedFile, peers, addNotification]);
 
   const handlePickerClose = useCallback(() => {
     setShowPicker(false);
@@ -275,9 +280,22 @@ export default function App() {
     if (pinInput.length !== 6) return;
     api.submitPin(pinChallenge.transferId, pinInput);
     setPinChallenge(null);
+    setPinChallengeStep('prompt');
     setPinInput('');
     setPinError(false);
   }, [pinChallenge, pinInput]);
+
+  const handlePinCancel = useCallback(() => {
+    if (!pinChallenge) return;
+    // Cancel the in-flight transfer by destroying the sender socket.
+    // The simplest way is to submit a blank/bad value — instead we just
+    // close by letting the 30s timeout fire. For a snappier UX we could
+    // add a cancelTransfer IPC, but for now we clear the UI immediately.
+    setPinChallenge(null);
+    setPinChallengeStep('prompt');
+    setPinInput('');
+    setPinError(false);
+  }, [pinChallenge]);
 
   const activeTransfers = Object.values(transfers);
 
@@ -317,45 +335,98 @@ export default function App() {
             />
           }
           showPin={!!pinChallenge}
+          pinStep={pinChallengeStep}
           pinContent={
-            pinChallenge ? (
-              <div className="pin-panel">
-                <div className="pin-panel-header">
-                  <span className="pin-panel-icon">🔐</span>
-                  <div>
-                    <div className="pin-panel-title">PIN Required</div>
-                    <div className="pin-panel-subtitle">Ask the receiver for their PIN</div>
+            pinChallenge ? (() => {
+              const receiverName =
+                transfers[pinChallenge.transferId]?.peerName || 'the receiver';
+
+              if (pinChallengeStep === 'prompt') {
+                return (
+                  <div className="pin-panel">
+                    <div className="pin-panel-header">
+                      <span className="pin-panel-icon">🔐</span>
+                      <div>
+                        <div className="pin-panel-title">PIN Protected</div>
+                        <div className="pin-panel-subtitle">
+                          {receiverName} requires a PIN to accept files
+                        </div>
+                      </div>
+                    </div>
+                    <p className="pin-share-hint">
+                      Ask <strong>{receiverName}</strong> to share their PIN with you,
+                      then enter it below.
+                    </p>
+                    <div className="pin-panel-actions pin-share-actions">
+                      <button
+                        type="button"
+                        className="cancel-btn"
+                        onClick={handlePinCancel}
+                      >
+                        Decline
+                      </button>
+                      <button
+                        type="button"
+                        className="pin-panel-submit"
+                        onClick={() => setPinChallengeStep('enter')}
+                      >
+                        Enter PIN →
+                      </button>
+                    </div>
                   </div>
+                );
+              }
+
+              // step === 'enter'
+              return (
+                <div className="pin-panel">
+                  <div className="pin-panel-header">
+                    <span className="pin-panel-icon">🔐</span>
+                    <div>
+                      <div className="pin-panel-title">Enter PIN</div>
+                      <div className="pin-panel-subtitle">
+                        Type the PIN shared by {receiverName}
+                      </div>
+                    </div>
+                  </div>
+                  <form onSubmit={handlePinSubmit} className="pin-panel-form">
+                    <input
+                      className={`pin-panel-input ${pinError ? 'has-error' : ''}`}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      placeholder="_ _ _ _ _ _"
+                      value={pinInput}
+                      onChange={(e) => {
+                        setPinError(false);
+                        setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6));
+                      }}
+                      autoFocus
+                    />
+                    {pinError && (
+                      <span className="pin-panel-error">Wrong PIN — try again</span>
+                    )}
+                    <div className="pin-panel-actions">
+                      <button
+                        type="button"
+                        className="cancel-btn"
+                        onClick={() => setPinChallengeStep('prompt')}
+                      >
+                        ← Back
+                      </button>
+                      <button
+                        type="submit"
+                        className="pin-panel-submit"
+                        disabled={pinInput.length !== 6}
+                      >
+                        Submit
+                      </button>
+                    </div>
+                  </form>
                 </div>
-                <form onSubmit={handlePinSubmit} className="pin-panel-form">
-                  <input
-                    className={`pin-panel-input ${pinError ? 'has-error' : ''}`}
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={6}
-                    placeholder="_ _ _ _ _ _"
-                    value={pinInput}
-                    onChange={(e) => {
-                      setPinError(false);
-                      setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6));
-                    }}
-                    autoFocus
-                  />
-                  {pinError && <span className="pin-panel-error">Wrong PIN — try again</span>}
-                  <div className="pin-panel-actions">
-                    <button type="button" className="cancel-btn"
-                      onClick={() => { setPinChallenge(null); setPinInput(''); setPinError(false); }}>
-                      Cancel
-                    </button>
-                    <button type="submit" className="pin-panel-submit"
-                      disabled={pinInput.length !== 6}>
-                      Submit
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ) : null
+              );
+            })() : null
           }
           onOpenSettings={() => { setShowSettings(true); setShowPicker(false); }}
         />
