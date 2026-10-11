@@ -322,6 +322,21 @@ ipcMain.handle('submit-pin', (event, { transferId, pin }) => {
   if (transferService) transferService.submitPin(transferId, pin);
 });
 
+// Sender cancels a pending/in-flight transfer
+ipcMain.handle('cancel-transfer', (event, { transferId }) => {
+  if (transferService) transferService.cancelTransfer(transferId);
+});
+
+// Receiver asks the service to show their PIN (so they can relay it to the sender)
+ipcMain.handle('reveal-pin-to-receiver', (event, { transferId }) => {
+  if (transferService) transferService.revealPinToReceiver(transferId);
+});
+
+// Receiver declines a PIN-protected incoming connection
+ipcMain.handle('decline-pin-request', (event, { transferId }) => {
+  if (transferService) transferService.declinePinRequest(transferId);
+});
+
 // Send a ping to a peer
 ipcMain.handle('send-ping', async (event, { peerId }) => {
   if (discoveryService) discoveryService.sendPing(peerId);
@@ -401,6 +416,22 @@ app.whenReady().then(async () => {
       mainWindow.show();
       mainWindow.focus();
       mainWindow.webContents.send('pin-required', info);
+    }
+  });
+
+  // Receiver gets notified that a PIN-protected sender has connected
+  transferService.on('pin-share-request', (info) => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.send('pin-share-request', info);
+    }
+  });
+
+  // Receiver explicitly asked to see their PIN so they can share it
+  transferService.on('show-pin-to-receiver', (info) => {
+    if (mainWindow) {
+      mainWindow.webContents.send('show-pin-to-receiver', info);
     }
   });
 

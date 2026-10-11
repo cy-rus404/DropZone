@@ -151,3 +151,50 @@
 .accept-btn:hover {
   box-shadow: 0 4px 24px rgba(124, 111, 247, 0.55);
 }
+
+
+/* ── PIN Share Prompt additions ──────────────────────────────────────────── */
+
+/* Hint text shown before the PIN is revealed */
+.pin-share-body-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Revealed PIN block */
+.pin-reveal-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 0 4px;
+}
+
+.pin-reveal-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.pin-reveal-digits {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  color: var(--text-primary);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  padding: 6px 16px;
+  background: rgba(124, 111, 247, 0.1);
+  border: 1px solid rgba(124, 111, 247, 0.25);
+  border-radius: 10px;
+}
+
+.pin-reveal-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin: 0;
+}

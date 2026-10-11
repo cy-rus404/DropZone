@@ -140,7 +140,60 @@ class TransferService extends EventEmitter {
   }
 
   /**
-   * Called by the sender UI after the user types their PIN into the dialog.
+   * Called by the sender UI when the user hits Decline/Cancel during the PIN
+   * prompt (or at any point before the transfer completes).  Destroys the
+   * outgoing socket and emits transfer-error so the UI cleans up.
+   *
+   * @param {string} transferId
+   */
+  cancelTransfer(transferId) {
+    const entry = this.activeSending.get(transferId);
+    if (!entry) return;
+    entry.socket.destroy();
+    this.activeSending.delete(transferId);
+    entry.reject(new Error('cancelled'));
+    this.emit('transfer-error', { transferId, error: 'cancelled' });
+    console.log(`[Transfer] Transfer ${transferId} cancelled by sender`);
+  }
+
+  /**
+   * Called by the receiver UI when they choose to share their PIN with an
+   * incoming sender.  Looks up the pending PIN check and writes the PIN
+   * back to the sender as an out-of-band JSON message so they can see it.
+   * The sender still has to type it manually — this just surfaces the PIN
+   * on the receiver's screen so they can relay it.
+   *
+   * @param {string} transferId
+   */
+  revealPinToReceiver(transferId) {
+    // Nothing to send over the wire — this is purely a local event so the
+    // receiver UI can display the PIN.  The pin value lives in this.currentPin.
+    // We emit a local event; main.js forwards it to the renderer.
+    if (this.pendingPinCheck.has(transferId)) {
+      this.emit('show-pin-to-receiver', { transferId, pin: this.currentPin });
+    }
+  }
+
+  /**
+   * Called by the receiver UI when they choose to DECLINE the incoming transfer
+   * during the PIN-share prompt (before they have shared their PIN).
+   * Destroys the pending socket so the sender gets a connection close.
+   *
+   * @param {string} transferId
+   */
+  declinePinRequest(transferId) {
+    const entry = this.pendingPinCheck.get(transferId);
+    if (!entry) return;
+    clearTimeout(entry.timer);
+    this.pendingPinCheck.delete(transferId);
+    // Write a decline response so the sender gets a clean error, not a timeout
+    try { entry.socket.write(JSON.stringify({ type: 'transfer-decline', transferId })); } catch (_) {}
+    entry.socket.destroy();
+    console.log(`[Transfer] Receiver declined PIN request for ${transferId}`);
+  }
+
+  /**
+   * Called by the sender UI when they want to submit a PIN.
    * Locates the active sending socket and writes a pin-response message.
    *
    * @param {string} transferId
@@ -364,6 +417,9 @@ class TransferService extends EventEmitter {
 
     // Tell the sender they must supply a PIN.
     socket.write(JSON.stringify({ type: 'pin-required' }));
+
+    // Notify the receiver's UI so they can choose to share their PIN or decline.
+    this.emit('pin-share-request', { transferId, senderName });
 
     // Accumulate data arriving on this socket for the pin-response message.
     let pinResponseBuf = Buffer.alloc(0);

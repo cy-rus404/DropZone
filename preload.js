@@ -24,6 +24,9 @@ contextBridge.exposeInMainWorld('dropzone', {
   showSaveDialog:  (filename)  => ipcRenderer.invoke('show-save-dialog', { filename }),
   showFolderDialog: ()         => ipcRenderer.invoke('show-folder-dialog'),
   submitPin: (transferId, pin) => ipcRenderer.invoke('submit-pin', { transferId, pin }),
+  cancelTransfer: (transferId) => ipcRenderer.invoke('cancel-transfer', { transferId }),
+  revealPinToReceiver: (transferId) => ipcRenderer.invoke('reveal-pin-to-receiver', { transferId }),
+  declinePinRequest: (transferId) => ipcRenderer.invoke('decline-pin-request', { transferId }),
 
   // ── Window ────────────────────────────────────────────────────────────────
   resizeWindow: (width, height) => ipcRenderer.send('resize-window', { width, height }),
@@ -40,6 +43,8 @@ contextBridge.exposeInMainWorld('dropzone', {
   onTransferError:     (cb) => ipcRenderer.on('transfer-error',            (_, d) => cb(d)),
   onPingReceived:      (cb) => ipcRenderer.on('ping-received',             (_, d) => cb(d)),
   onPinRequired:       (cb) => ipcRenderer.on('pin-required',              (_, d) => cb(d)),
+  onPinShareRequest:   (cb) => ipcRenderer.on('pin-share-request',         (_, d) => cb(d)),
+  onShowPinToReceiver: (cb) => ipcRenderer.on('show-pin-to-receiver',      (_, d) => cb(d)),
 
   // ── Cleanup ───────────────────────────────────────────────────────────────
   removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),

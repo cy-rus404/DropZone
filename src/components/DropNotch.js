@@ -57,34 +57,6 @@ export default function DropNotch({
   const [pingTarget, setPingTarget] = useState(null);
   const dragCounter = useRef(0);
 
-  // ── Pill drag-to-reposition ──────────────────────────────────────────────
-  const pillDragging  = useRef(false);
-  const pillDragStart = useRef({ mouseX: 0, mouseY: 0, winX: 0, winY: 0 });
-
-  const handlePillMouseDown = useCallback((e) => {
-    if (e.button !== 0) return;
-    if (e.target.closest('button, input')) return;
-    e.preventDefault();
-    pillDragging.current = true;
-    window.dropzone.getPillPosition().then(({ x, y }) => {
-      pillDragStart.current = { mouseX: e.screenX, mouseY: e.screenY, winX: x, winY: y };
-    });
-  }, []);
-
-  const handlePillMouseMove = useCallback((e) => {
-    if (!pillDragging.current) return;
-    const dx = e.screenX - pillDragStart.current.mouseX;
-    const dy = e.screenY - pillDragStart.current.mouseY;
-    window.dropzone.savePillPosition(
-      pillDragStart.current.winX + dx,
-      pillDragStart.current.winY + dy,
-    );
-  }, []);
-
-  const handlePillMouseUp = useCallback(() => {
-    pillDragging.current = false;
-  }, []);
-
   // ── Hover ────────────────────────────────────────────────────────────────
   const handleMouseEnter = useCallback(() => {
     setIsHovered(true);
@@ -166,9 +138,6 @@ export default function DropNotch({
       transition={spring}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onMouseDown={handlePillMouseDown}
-      onMouseMove={handlePillMouseMove}
-      onMouseUp={handlePillMouseUp}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
