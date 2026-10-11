@@ -8,6 +8,7 @@
     "react-start": "react-scripts start",
     "react-build": "react-scripts build",
     "build": "npm run react-build && electron-builder",
+    "build:win": "npm run react-build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win",
     "electron": "electron .",
     "dev": "concurrently \"cross-env BROWSER=none react-scripts start\" \"wait-on http://localhost:3000 && electron .\""
   },
@@ -32,6 +33,8 @@
   "build": {
     "appId": "com.dropzone.app",
     "productName": "DropZone",
+    "copyright": "Copyright © 2024 DropZone",
+    "extends": null,
     "files": [
       "build/**/*",
       "main.js",
@@ -40,19 +43,53 @@
       "node_modules/**/*"
     ],
     "directories": {
-      "buildResources": "assets"
+      "buildResources": "assets",
+      "output": "dist"
     },
     "win": {
-      "target": "nsis",
-      "icon": "assets/icon.ico"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "publisherName": "DropZone",
+      "requestedExecutionLevel": "asInvoker",
+      "sign": null,
+      "signingHashAlgorithms": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DropZone",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "license": "LICENSE.txt"
     },
     "mac": {
       "target": "dmg",
-      "icon": "assets/icon.icns"
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.utilities"
     },
     "linux": {
       "target": "AppImage",
-      "icon": "assets/icon.png"
+      "icon": "assets/icon.png",
+      "category": "Utility"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "cy-rus404",
+      "repo": "DropZone"
     }
   },
   "browserslist": {
