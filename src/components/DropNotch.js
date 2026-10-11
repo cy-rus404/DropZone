@@ -46,6 +46,8 @@ export default function DropNotch({
   showPicker,
   showSettings,
   settingsContent,
+  showPin,
+  pinContent,
   onHoverChange,
   onOpenSettings,
 }) {
@@ -138,12 +140,14 @@ export default function DropNotch({
     ? 80
     : Math.min(peers.length, 4) * 54 + 8;
 
-  const isActive   = showPicker || showSettings || transfers.length > 0 || isDragOver;
+  const isActive   = showPicker || showSettings || showPin || transfers.length > 0 || isDragOver;
   const isExpanded = isHovered || isActive;
 
   const expandedWidth  = isExpanded ? 380 : 120;
   const expandedHeight = isExpanded
-    ? showSettings
+    ? showPin
+      ? 52 + 1 + 148             // bar + divider + pin panel
+      : showSettings
       ? 52 + 1 + 268
       : showPicker
       ? 52 + 1 + pickerContentH + 44
@@ -225,6 +229,11 @@ export default function DropNotch({
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                     Settings
                   </motion.span>
+                ) : showPin ? (
+                  <motion.span key="pin" className="hint-dim"
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    Enter PIN
+                  </motion.span>
                 ) : showPicker ? (
                   <motion.span key="pick" className="hint-dim"
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -277,6 +286,18 @@ export default function DropNotch({
             transition={{ duration: 0.12 }}>
             <div className="divider" />
             {settingsContent}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── PIN Entry Panel (sender side) ── */}
+      <AnimatePresence>
+        {showPin && isExpanded && (
+          <motion.div className="notch-expanded"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.12 }}>
+            <div className="divider" />
+            {pinContent}
           </motion.div>
         )}
       </AnimatePresence>
@@ -340,7 +361,7 @@ export default function DropNotch({
 
       {/* ── Transfer progress ── */}
       <AnimatePresence>
-        {transfers.length > 0 && !showPicker && !showSettings && isExpanded && (
+        {transfers.length > 0 && !showPicker && !showSettings && !showPin && isExpanded && (
           <motion.div className="notch-expanded"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.12 }}>

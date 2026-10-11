@@ -349,6 +349,85 @@
   box-shadow: 0 0 8px rgba(251, 191, 36, 0.25);
 }
 
+/* ── PIN entry panel (inside pill, sender side) ───────── */
+.pin-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 12px;
+}
+
+.pin-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pin-panel-icon { font-size: 22px; flex-shrink: 0; }
+
+.pin-panel-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.pin-panel-subtitle {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.pin-panel-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+}
+
+.pin-panel-input {
+  width: 160px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 9px 14px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.22em;
+  text-align: center;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.pin-panel-input:focus { border-color: rgba(124,111,247,0.6); box-shadow: 0 0 0 3px rgba(124,111,247,0.15); }
+.pin-panel-input.has-error { border-color: var(--error); }
+.pin-panel-input::placeholder { color: rgba(255,255,255,0.2); letter-spacing: 0.15em; }
+
+.pin-panel-error {
+  font-size: 10px;
+  color: var(--error);
+}
+
+.pin-panel-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.pin-panel-submit {
+  padding: 6px 18px;
+  background: linear-gradient(135deg, #7c6ff7, #6055e0);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: opacity 0.1s;
+}
+.pin-panel-submit:disabled { opacity: 0.35; cursor: default; }
+.pin-panel-submit:not(:disabled):hover { opacity: 0.85; }
+
 /* No peers */
 .no-peers {
   display: flex;

@@ -173,7 +173,7 @@ export default function Settings({
               </div>
 
               <p className="settings-pin-hint">
-                Senders must enter this PIN before you accept
+                Share this PIN with anyone who wants to send you a file
               </p>
             </motion.div>
           )}

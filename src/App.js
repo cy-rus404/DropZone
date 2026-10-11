@@ -114,7 +114,7 @@ export default function App() {
       setPinChallenge({ transferId: info.transferId });
       setPinInput('');
       setPinError(false);
-      api.resizeWindow(400, 240);
+      api.resizeWindow(400, 52 + 1 + 148 + 12);
     });
 
     return () => {
@@ -126,11 +126,13 @@ export default function App() {
 
   // ── Window sizing ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (needsNameSetup || pinChallenge) return;
+    if (needsNameSetup) return;
     const activeTransfers = Object.values(transfers);
-    const W   = 400;  // 20px wider than pill for breathing room
-    const PAD = 12;   // extra bottom padding
-    if (showSettings) {
+    const W   = 400;
+    const PAD = 12;
+    if (pinChallenge) {
+      api.resizeWindow(W, 52 + 1 + 148 + PAD);
+    } else if (showSettings) {
       api.resizeWindow(W, 52 + 1 + 268 + PAD);
     } else if (showPicker) {
       const peerH = peers.length === 0 ? 80 : Math.min(peers.length, 4) * 54 + 8;
@@ -140,7 +142,7 @@ export default function App() {
     } else if (!incomingRequest) {
       api.resizeWindow(W, 36 + PAD);
     }
-  }, [showSettings, showPicker, transfers, peers.length, incomingRequest, needsNameSetup, pinChallenge]);
+  }, [pinChallenge, showSettings, showPicker, transfers, peers.length, incomingRequest, needsNameSetup]);
 
   // ── Notifications ──────────────────────────────────────────────────────────
   const addNotification = useCallback((message) => {
@@ -314,6 +316,47 @@ export default function App() {
               onClose={() => setShowSettings(false)}
             />
           }
+          showPin={!!pinChallenge}
+          pinContent={
+            pinChallenge ? (
+              <div className="pin-panel">
+                <div className="pin-panel-header">
+                  <span className="pin-panel-icon">🔐</span>
+                  <div>
+                    <div className="pin-panel-title">PIN Required</div>
+                    <div className="pin-panel-subtitle">Ask the receiver for their PIN</div>
+                  </div>
+                </div>
+                <form onSubmit={handlePinSubmit} className="pin-panel-form">
+                  <input
+                    className={`pin-panel-input ${pinError ? 'has-error' : ''}`}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    placeholder="_ _ _ _ _ _"
+                    value={pinInput}
+                    onChange={(e) => {
+                      setPinError(false);
+                      setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6));
+                    }}
+                    autoFocus
+                  />
+                  {pinError && <span className="pin-panel-error">Wrong PIN — try again</span>}
+                  <div className="pin-panel-actions">
+                    <button type="button" className="cancel-btn"
+                      onClick={() => { setPinChallenge(null); setPinInput(''); setPinError(false); }}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="pin-panel-submit"
+                      disabled={pinInput.length !== 6}>
+                      Submit
+                    </button>
+                  </div>
+                </form>
+              </div>
+            ) : null
+          }
           onOpenSettings={() => { setShowSettings(true); setShowPicker(false); }}
         />
       )}
@@ -326,50 +369,6 @@ export default function App() {
             onAccept={handleAccept}
             onDecline={handleDecline}
           />
-        )}
-      </AnimatePresence>
-
-      {/* PIN entry dialog (sender side — receiver requires a PIN) */}
-      <AnimatePresence>
-        {pinChallenge && (
-          <motion.div
-            className="pin-overlay"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ type: 'spring', stiffness: 420, damping: 28 }}
-          >
-            <div className="pin-icon">🔐</div>
-            <div className="pin-title">PIN Required</div>
-            <p className="pin-subtitle">The receiver requires a PIN to accept this transfer.</p>
-            <form onSubmit={handlePinSubmit} className="pin-form">
-              <input
-                className={`pin-input ${pinError ? 'has-error' : ''}`}
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={6}
-                placeholder="000000"
-                value={pinInput}
-                onChange={(e) => {
-                  setPinError(false);
-                  setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6));
-                }}
-                autoFocus
-              />
-              {pinError && <span className="pin-error-msg">Wrong PIN — try again</span>}
-              <div className="pin-actions">
-                <button type="button" className="pin-cancel-btn"
-                  onClick={() => { setPinChallenge(null); setPinInput(''); setPinError(false); }}>
-                  Cancel
-                </button>
-                <button type="submit" className="pin-submit-btn"
-                  disabled={pinInput.length !== 6}>
-                  Submit
-                </button>
-              </div>
-            </form>
-          </motion.div>
         )}
       </AnimatePresence>
 
