@@ -2,12 +2,22 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import './NameSetup.css';
 
+const AVATARS = [
+  '🐶','🐱','🦊','🐼','🐨','🦁',
+  '🐯','🐸','🐧','🦋','🦄','🐲',
+  '👾','🤖','👻','🎃','⚡','🔥',
+  '🌊','🌈','🍕','🎮','🚀','💎',
+];
+
+const DEFAULT_AVATAR = '🤖';
+
 /**
- * NameSetup — First-launch modal asking the user to set a display name.
- * Shown once; the name is saved to device.json via IPC.
+ * NameSetup — First-launch modal asking the user to choose an avatar and set a
+ * display name. Shown once; the name and avatar are saved to device.json via IPC.
  */
 export default function NameSetup({ onSave }) {
   const [name, setName] = useState('');
+  const [avatar, setAvatar] = useState(DEFAULT_AVATAR);
   const [error, setError] = useState('');
 
   const handleSubmit = (e) => {
@@ -15,7 +25,7 @@ export default function NameSetup({ onSave }) {
     const trimmed = name.trim();
     if (!trimmed) { setError('Please enter a name'); return; }
     if (trimmed.length > 32) { setError('Name must be 32 characters or less'); return; }
-    onSave(trimmed);
+    onSave(trimmed, avatar);
   };
 
   return (
@@ -30,11 +40,29 @@ export default function NameSetup({ onSave }) {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 420, damping: 34 }}
       >
-        <div className="name-setup-icon">🌀</div>
         <h1 className="name-setup-title">Welcome to DropZone</h1>
         <p className="name-setup-subtitle">
-          Set a display name so others on your network know who you are.
+          Pick an avatar and set a display name so others on your network know who you are.
         </p>
+
+        {/* Avatar preview */}
+        <div className="avatar-preview">{avatar}</div>
+
+        {/* Avatar grid */}
+        <div className="avatar-grid">
+          {AVATARS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              className={`avatar-option${avatar === emoji ? ' selected' : ''}`}
+              onClick={() => setAvatar(emoji)}
+              aria-label={`Select avatar ${emoji}`}
+              aria-pressed={avatar === emoji}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
 
         <form onSubmit={handleSubmit} className="name-setup-form">
           <input

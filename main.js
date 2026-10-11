@@ -15,8 +15,22 @@ let transferService = null;
 
 // Unique device ID persisted across sessions
 const configPath = path.join(app.getPath('userData'), 'device.json');
-let deviceId = null;
-let deviceName = null;
+let deviceId     = null;
+let deviceName   = null;
+let deviceAvatar = null;
+
+// Saved pill position — loaded from device.json on startup
+let pillX = null;
+let pillY = null;
+
+// Settings persisted in device.json
+let saveFolder  = null;   // default save path or null
+let pinEnabled  = false;
+let currentPin  = null;   // 6-digit string
+
+function generatePin() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
 
 /**
  * On Windows, silently add firewall rules for the discovery broadcast port and
@@ -45,30 +59,48 @@ function ensureWindowsFirewallRules() {
 }
 
 function loadOrCreateDeviceId() {
+  const { width: screenWidth } = screen.getPrimaryDisplay().workAreaSize;
+
   try {
     if (fs.existsSync(configPath)) {
       const data = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      deviceId = data.id;
-      deviceName = data.name;
+      deviceId     = data.id;
+      deviceName   = data.name;
+      deviceAvatar = data.avatar || null;
+
+      // Load saved pill position if present
+      if (typeof data.pillX === 'number' && typeof data.pillY === 'number') {
+        pillX = data.pillX;
+        pillY = data.pillY;
+      }
+
+      // Load settings
+      saveFolder = data.saveFolder || null;
+      pinEnabled = !!data.pinEnabled;
+      currentPin = data.currentPin || generatePin();
     }
   } catch (e) {}
 
   if (!deviceId) {
     deviceId = uuidv4();
-    // No name yet — leave deviceName null so the renderer shows the setup screen
     deviceName = null;
-    fs.writeFileSync(configPath, JSON.stringify({ id: deviceId, name: null }));
+    currentPin = generatePin();
+    fs.writeFileSync(configPath, JSON.stringify({ id: deviceId, name: null, currentPin }));
+  }
+
+  // Default pill position: center-top
+  if (pillX === null || pillY === null) {
+    pillX = Math.floor(screenWidth / 2) - 200;
+    pillY = 0;
   }
 }
 
 function createMainWindow() {
-  const { width: screenWidth } = screen.getPrimaryDisplay().workAreaSize;
-
   mainWindow = new BrowserWindow({
     width: 400,
     height: 380,
-    x: Math.floor(screenWidth / 2) - 200,
-    y: 0,
+    x: pillX,
+    y: pillY,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -153,17 +185,18 @@ function createTray() {
 
 // Renderer asks for this device's info
 ipcMain.handle('get-device-info', () => {
-  return { id: deviceId, name: deviceName, needsNameSetup: !deviceName };
+  return { id: deviceId, name: deviceName, avatar: deviceAvatar, needsNameSetup: !deviceName };
 });
 
-// Renderer saves the user's chosen display name
-ipcMain.handle('save-device-name', (event, { name }) => {
-  deviceName = name;
-  fs.writeFileSync(configPath, JSON.stringify({ id: deviceId, name: deviceName }));
-  // Update the running services with the new name
+// Renderer saves the user's chosen display name and avatar
+ipcMain.handle('save-device-name', (event, { name, avatar }) => {
+  deviceName   = name;
+  deviceAvatar = avatar || null;
+  persistConfig();
+  // Update the running services with the new name/avatar
   if (discoveryService) {
-    discoveryService.deviceName = name;
-    // Re-advertise with the new name
+    discoveryService.deviceName   = name;
+    discoveryService.deviceAvatar = avatar || null;
     discoveryService.stop();
     discoveryService.start();
   }
@@ -209,13 +242,84 @@ ipcMain.handle('show-save-dialog', async (event, { filename }) => {
   return result;
 });
 
-// Resize the window (notch expand/collapse)
+// Resize the window (notch expand/collapse) — keep centered on the pill's current x center
 ipcMain.on('resize-window', (event, { width, height }) => {
   if (mainWindow) {
-    const { width: screenWidth } = screen.getPrimaryDisplay().workAreaSize;
+    const bounds = mainWindow.getBounds();
+    const currentCenterX = bounds.x + Math.floor(bounds.width / 2);
+    const newX = currentCenterX - Math.floor(width / 2);
     mainWindow.setSize(width, height, true);
-    mainWindow.setPosition(Math.floor(screenWidth / 2) - Math.floor(width / 2), 0, true);
+    mainWindow.setPosition(newX, bounds.y, true);
   }
+});
+
+// Save pill position: update window position and persist to device.json
+ipcMain.handle('save-pill-position', (event, { x, y }) => {
+  if (mainWindow) mainWindow.setPosition(x, y, false);
+  pillX = x;
+  pillY = y;
+  persistConfig();
+  return { success: true };
+});
+
+// Get current pill position from the window bounds
+ipcMain.handle('get-pill-position', () => {
+  if (mainWindow) {
+    const bounds = mainWindow.getBounds();
+    return { x: bounds.x, y: bounds.y };
+  }
+  return { x: pillX, y: pillY };
+});
+
+// ── Settings helpers ──────────────────────────────────────────────────────────
+
+function persistConfig() {
+  try {
+    let data = {};
+    if (fs.existsSync(configPath)) {
+      data = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    }
+    Object.assign(data, {
+      id: deviceId, name: deviceName, avatar: deviceAvatar,
+      pillX, pillY, saveFolder, pinEnabled, currentPin,
+    });
+    fs.writeFileSync(configPath, JSON.stringify(data));
+  } catch (e) {
+    console.warn('[persistConfig] Failed:', e.message);
+  }
+}
+
+// Get current settings
+ipcMain.handle('get-settings', () => ({
+  saveFolder,
+  pinEnabled,
+  pin: currentPin,
+}));
+
+// Save settings (PIN toggle, PIN refresh, save folder)
+ipcMain.handle('save-settings', (event, settings) => {
+  if (typeof settings.pinEnabled === 'boolean') pinEnabled = settings.pinEnabled;
+  if (settings.refreshPin) currentPin = generatePin();
+  if ('saveFolder' in settings) saveFolder = settings.saveFolder;
+  persistConfig();
+  // Update transfer service with new PIN state
+  if (transferService) transferService.setPin(currentPin, pinEnabled);
+  return { success: true, pin: currentPin };
+});
+
+// Open a folder picker dialog
+ipcMain.handle('show-folder-dialog', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choose default save folder',
+    buttonLabel: 'Select Folder',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  return result;
+});
+
+// Sender submits a PIN
+ipcMain.handle('submit-pin', (event, { transferId, pin }) => {
+  if (transferService) transferService.submitPin(transferId, pin);
 });
 
 // Send a ping to a peer
@@ -259,8 +363,11 @@ app.whenReady().then(async () => {
   const DiscoveryService = require('./src/services/discoveryService');
   const TransferService = require('./src/services/transferService');
 
-  discoveryService = new DiscoveryService(deviceId, deviceName, TRANSFER_PORT);
+  discoveryService = new DiscoveryService(deviceId, deviceName, TRANSFER_PORT, deviceAvatar);
   transferService = new TransferService(deviceId, deviceName, TRANSFER_PORT);
+
+  // Apply persisted PIN settings to the transfer service
+  transferService.setPin(currentPin, pinEnabled);
 
   // Wire transfer service events → renderer
   transferService.on('incoming-request', (transferInfo) => {
@@ -286,6 +393,14 @@ app.whenReady().then(async () => {
   transferService.on('transfer-error', (info) => {
     if (mainWindow) {
       mainWindow.webContents.send('transfer-error', info);
+    }
+  });
+
+  transferService.on('pin-required', (info) => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.send('pin-required', info);
     }
   });
 

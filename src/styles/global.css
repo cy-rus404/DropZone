@@ -99,6 +99,102 @@ body,
   margin-top: 6px;
 }
 
+/* ── PIN entry dialog (sender side) ────────────────────── */
+.pin-overlay {
+  position: fixed;
+  top: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 320px;
+  background: rgba(14, 14, 20, 0.96);
+  border: 1px solid rgba(124, 111, 247, 0.3);
+  border-radius: 18px;
+  padding: 20px 20px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(124,111,247,0.1);
+  z-index: 500;
+}
+
+.pin-icon   { font-size: 28px; margin-bottom: 2px; }
+.pin-title  { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.pin-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.4;
+  max-width: 240px;
+  margin-bottom: 4px;
+}
+
+.pin-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.pin-input {
+  width: 140px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.25em;
+  text-align: center;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.pin-input:focus { border-color: rgba(124,111,247,0.6); }
+.pin-input.has-error { border-color: var(--error); }
+
+.pin-error-msg {
+  font-size: 11px;
+  color: var(--error);
+}
+
+.pin-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.pin-cancel-btn {
+  padding: 8px 16px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: background 0.1s;
+}
+.pin-cancel-btn:hover { background: rgba(255,255,255,0.1); }
+
+.pin-submit-btn {
+  padding: 8px 20px;
+  background: linear-gradient(135deg, #7c6ff7, #6055e0);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: opacity 0.1s;
+}
+.pin-submit-btn:disabled { opacity: 0.4; cursor: default; }
+.pin-submit-btn:not(:disabled):hover { opacity: 0.9; }
+
 /* ── Scrollbar ───────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 4px;

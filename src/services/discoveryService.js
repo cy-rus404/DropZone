@@ -29,10 +29,11 @@ const PEER_EXPIRY_MS = 16000;          // remove peer if no beacon for ~3 interv
  *   'peers-updated' → array of peer objects whenever the peer list changes
  */
 class DiscoveryService extends EventEmitter {
-  constructor(deviceId, deviceName, port) {
+  constructor(deviceId, deviceName, port, deviceAvatar) {
     super();
-    this.deviceId = deviceId;
-    this.deviceName = deviceName;
+    this.deviceId     = deviceId;
+    this.deviceName   = deviceName;
+    this.deviceAvatar = deviceAvatar || null;
     this.port = port;
 
     // mDNS
@@ -98,10 +99,11 @@ class DiscoveryService extends EventEmitter {
         protocol: SERVICE_PROTOCOL,
         port: this.port,
         txt: {
-          id: this.deviceId,
-          name: this.deviceName,
+          id:       this.deviceId,
+          name:     this.deviceName,
+          avatar:   this.deviceAvatar || '',
           platform: process.platform,
-          version: '1.0.0',
+          version:  '1.0.0',
         },
       });
 
@@ -170,12 +172,13 @@ class DiscoveryService extends EventEmitter {
 
       const host = await this._resolveHost(rawHost);
       this._addPeer({
-        id: peerId,
-        name: txt.name || service.name,
+        id:       peerId,
+        name:     txt.name || service.name,
+        avatar:   txt.avatar || null,
         host,
-        port: service.port,
+        port:     service.port,
         platform: txt.platform || 'unknown',
-        via: 'mdns',
+        via:      'mdns',
       });
     } catch (err) {
       console.error('[Discovery] mDNS service up error:', err);
@@ -273,10 +276,11 @@ class DiscoveryService extends EventEmitter {
   _sendBeacon() {
     if (!this.udpSocket) return;
     const beacon = Buffer.from(JSON.stringify({
-      type: 'dropzone-beacon',
-      id: this.deviceId,
-      name: this.deviceName || 'Unknown Device',
-      port: this.port,
+      type:     'dropzone-beacon',
+      id:       this.deviceId,
+      name:     this.deviceName || 'Unknown Device',
+      avatar:   this.deviceAvatar || '',
+      port:     this.port,
       platform: process.platform,
     }));
 
@@ -292,12 +296,13 @@ class DiscoveryService extends EventEmitter {
         if (!data.id || data.id === this.deviceId) return;
         // Always update — name or host may have changed since first discovery
         this._addPeer({
-          id: data.id,
-          name: data.name || 'Unknown Device',
-          host: rinfo.address,
-          port: data.port,
+          id:       data.id,
+          name:     data.name || 'Unknown Device',
+          avatar:   data.avatar || null,
+          host:     rinfo.address,
+          port:     data.port,
           platform: data.platform || 'unknown',
-          via: 'udp',
+          via:      'udp',
         });
       } else if (data.type === 'dropzone-goodbye') {
         if (!data.id || data.id === this.deviceId) return;
@@ -350,9 +355,10 @@ class DiscoveryService extends EventEmitter {
 
     // Only emit an update if something meaningful changed
     const changed = !existing
-      || existing.name !== entry.name
-      || existing.host !== entry.host
-      || existing.port !== entry.port;
+      || existing.name   !== entry.name
+      || existing.avatar !== entry.avatar
+      || existing.host   !== entry.host
+      || existing.port   !== entry.port;
 
     this.peers.set(peer.id, entry);
 

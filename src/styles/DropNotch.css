@@ -56,6 +56,27 @@
   line-height: 1.4;
 }
 
+/* Settings gear button */
+.settings-gear-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.1s ease;
+  padding: 0;
+}
+
+.settings-gear-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 /* ── Expanded top bar ─────────────────────────────── */
 .notch-bar {
   display: flex;

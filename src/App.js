@@ -4,20 +4,32 @@ import { v4 as uuidv4 } from 'uuid';
 import DropNotch from './components/DropNotch';
 import IncomingPrompt from './components/IncomingPrompt';
 import NameSetup from './components/NameSetup';
+import Settings from './components/Settings';
 import './styles/global.css';
 
 const api = window.dropzone;
 
 export default function App() {
-  const [deviceInfo, setDeviceInfo]         = useState(null);
-  const [needsNameSetup, setNeedsNameSetup] = useState(false);
-  const [peers, setPeers]                   = useState([]);
-  const [droppedFile, setDroppedFile]       = useState(null);
-  const [showPicker, setShowPicker]         = useState(false);
+  const [deviceInfo, setDeviceInfo]           = useState(null);
+  const [needsNameSetup, setNeedsNameSetup]   = useState(false);
+  const [peers, setPeers]                     = useState([]);
+  const [droppedFile, setDroppedFile]         = useState(null);
+  const [showPicker, setShowPicker]           = useState(false);
+  const [showSettings, setShowSettings]       = useState(false);
   const [incomingRequest, setIncomingRequest] = useState(null);
-  const [transfers, setTransfers]           = useState({});
-  const [notifications, setNotifications]   = useState([]);
-  const [pingAlert, setPingAlert]           = useState(null);
+  const [transfers, setTransfers]             = useState({});
+  const [notifications, setNotifications]     = useState([]);
+  const [pingAlert, setPingAlert]             = useState(null);
+
+  // Settings state
+  const [saveFolder, setSaveFolder]   = useState(null);
+  const [pinEnabled, setPinEnabled]   = useState(false);
+  const [currentPin, setCurrentPin]   = useState(null);
+
+  // PIN entry dialog (sender side)
+  const [pinChallenge, setPinChallenge] = useState(null); // { transferId }
+  const [pinInput, setPinInput]         = useState('');
+  const [pinError, setPinError]         = useState(false);
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -26,11 +38,17 @@ export default function App() {
       setDeviceInfo(info);
       if (info.needsNameSetup) {
         setNeedsNameSetup(true);
-        api.resizeWindow(400, 380);
-        return; // don't load peers until name is set
+        api.resizeWindow(400, 480);
+        return;
       }
       const initialPeers = await api.getPeers();
       setPeers(initialPeers);
+
+      // Load settings
+      const settings = await api.getSettings();
+      setSaveFolder(settings.saveFolder || null);
+      setPinEnabled(settings.pinEnabled || false);
+      setCurrentPin(settings.pin || null);
     })();
 
     api.onPeersUpdated((updatedPeers) => setPeers(updatedPeers));
@@ -68,8 +86,16 @@ export default function App() {
         ...prev,
         [info.transferId]: { ...prev[info.transferId], ...info, status: 'error' },
       }));
+      // Clear PIN challenge if the error is PIN-related
+      if (info.error === 'wrong-pin' || info.error === 'pin-timeout') {
+        setPinChallenge(null);
+        setPinInput('');
+        if (info.error === 'wrong-pin') setPinError(true);
+      }
       addNotification(
-        info.error === 'declined' ? `❌ Transfer declined` : `❌ Transfer failed: ${info.error}`
+        info.error === 'declined'   ? `❌ Transfer declined`
+        : info.error === 'wrong-pin' ? `❌ Wrong PIN — transfer rejected`
+        : `❌ Transfer failed: ${info.error}`
       );
       setTimeout(() => {
         setTransfers((prev) => { const n = { ...prev }; delete n[info.transferId]; return n; });
@@ -83,31 +109,38 @@ export default function App() {
       setTimeout(() => setPingAlert(null), 4000);
     });
 
+    // Receiver requires a PIN — show PIN entry to the sender
+    api.onPinRequired((info) => {
+      setPinChallenge({ transferId: info.transferId });
+      setPinInput('');
+      setPinError(false);
+      api.resizeWindow(400, 240);
+    });
+
     return () => {
       ['peers-updated', 'incoming-transfer-request', 'transfer-progress',
-       'transfer-complete', 'transfer-error', 'ping-received']
+       'transfer-complete', 'transfer-error', 'ping-received', 'pin-required']
         .forEach((ch) => api.removeAllListeners(ch));
     };
   }, []);
 
   // ── Window sizing ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (needsNameSetup) return;
+    if (needsNameSetup || pinChallenge) return;
     const activeTransfers = Object.values(transfers);
-    // Window must be slightly wider than the pill (380px) so the pill border/
-    // rounded corners aren't clipped, and a few px taller so the bottom edge
-    // shows cleanly on every platform.
-    const W = 400;   // pill is 380px — 10px breathing room each side
-    const PAD = 12;  // extra bottom padding so content isn't cut off
-    if (showPicker) {
+    const W   = 400;  // 20px wider than pill for breathing room
+    const PAD = 12;   // extra bottom padding
+    if (showSettings) {
+      api.resizeWindow(W, 52 + 1 + 268 + PAD);
+    } else if (showPicker) {
       const peerH = peers.length === 0 ? 80 : Math.min(peers.length, 4) * 54 + 8;
       api.resizeWindow(W, 52 + 1 + peerH + 44 + PAD);
     } else if (activeTransfers.length > 0) {
       api.resizeWindow(W, 52 + 1 + activeTransfers.length * 54 + 12 + PAD);
     } else if (!incomingRequest) {
-      api.resizeWindow(W, 36 + PAD); // collapsed pill
+      api.resizeWindow(W, 36 + PAD);
     }
-  }, [showPicker, transfers, peers.length, incomingRequest, needsNameSetup]);
+  }, [showSettings, showPicker, transfers, peers.length, incomingRequest, needsNameSetup, pinChallenge]);
 
   // ── Notifications ──────────────────────────────────────────────────────────
   const addNotification = useCallback((message) => {
@@ -116,14 +149,44 @@ export default function App() {
     setTimeout(() => setNotifications((prev) => prev.filter((n) => n.id !== id)), 3500);
   }, []);
 
-  // ── Name setup save ────────────────────────────────────────────────────────
-  const handleNameSave = useCallback(async (name) => {
-    await api.saveDeviceName(name);
-    setDeviceInfo((prev) => ({ ...prev, name }));
+  // ── Name + avatar setup save ───────────────────────────────────────────────
+  const handleNameSave = useCallback(async (name, avatar) => {
+    await api.saveDeviceName(name, avatar);
+    setDeviceInfo((prev) => ({ ...prev, name, avatar }));
     setNeedsNameSetup(false);
     const initialPeers = await api.getPeers();
     setPeers(initialPeers);
+    const settings = await api.getSettings();
+    setSaveFolder(settings.saveFolder || null);
+    setPinEnabled(settings.pinEnabled || false);
+    setCurrentPin(settings.pin || null);
     api.resizeWindow(400, 36);
+  }, []);
+
+  // ── Settings handlers ──────────────────────────────────────────────────────
+  const handleTogglePin = useCallback(async (enabled) => {
+    const res = await api.saveSettings({ pinEnabled: enabled });
+    setPinEnabled(enabled);
+    if (res.pin) setCurrentPin(res.pin);
+  }, []);
+
+  const handleRefreshPin = useCallback(async () => {
+    const res = await api.saveSettings({ refreshPin: true });
+    if (res.pin) setCurrentPin(res.pin);
+  }, []);
+
+  const handlePickSaveFolder = useCallback(async () => {
+    const result = await api.showFolderDialog();
+    if (!result.canceled && result.filePaths?.[0]) {
+      const folder = result.filePaths[0];
+      await api.saveSettings({ saveFolder: folder });
+      setSaveFolder(folder);
+    }
+  }, []);
+
+  const handleClearSaveFolder = useCallback(async () => {
+    await api.saveSettings({ saveFolder: null });
+    setSaveFolder(null);
   }, []);
 
   // ── File drop ──────────────────────────────────────────────────────────────
@@ -132,7 +195,6 @@ export default function App() {
     setShowPicker(true);
   }, []);
 
-  // ── Open peer list without file (for ping) ─────────────────────────────────
   const handleOpenPeers = useCallback(() => {
     setShowPicker(true);
   }, []);
@@ -160,7 +222,6 @@ export default function App() {
     setDroppedFile(null);
   }, [droppedFile, addNotification]);
 
-  // ── Cancel picker ──────────────────────────────────────────────────────────
   const handlePickerClose = useCallback(() => {
     setShowPicker(false);
     setDroppedFile(null);
@@ -176,21 +237,29 @@ export default function App() {
   const handleAccept = useCallback(async () => {
     if (!incomingRequest) return;
     const { transferId, filename } = incomingRequest;
-    const result = await api.showSaveDialog(filename);
-    if (result.canceled) {
-      api.respondToTransfer(transferId, false, null);
-      setIncomingRequest(null);
-      return;
+
+    let filePath;
+    if (saveFolder) {
+      // Use default folder — no dialog
+      filePath = `${saveFolder}/${filename}`;
+    } else {
+      const result = await api.showSaveDialog(filename);
+      if (result.canceled) {
+        api.respondToTransfer(transferId, false, null);
+        setIncomingRequest(null);
+        return;
+      }
+      filePath = result.filePath;
     }
-    api.respondToTransfer(transferId, true, result.filePath);
+
+    api.respondToTransfer(transferId, true, filePath);
     setTransfers((prev) => ({
       ...prev,
       [transferId]: { transferId, filename, status: 'receiving', direction: 'receiving', percent: 0 },
     }));
     setIncomingRequest(null);
-  }, [incomingRequest]);
+  }, [incomingRequest, saveFolder]);
 
-  // ── Decline incoming ───────────────────────────────────────────────────────
   const handleDecline = useCallback(() => {
     if (!incomingRequest) return;
     api.respondToTransfer(incomingRequest.transferId, false, null);
@@ -198,11 +267,21 @@ export default function App() {
     addNotification('Transfer declined');
   }, [incomingRequest, addNotification]);
 
+  // ── PIN submission (sender side) ───────────────────────────────────────────
+  const handlePinSubmit = useCallback((e) => {
+    e.preventDefault();
+    if (pinInput.length !== 6) return;
+    api.submitPin(pinChallenge.transferId, pinInput);
+    setPinChallenge(null);
+    setPinInput('');
+    setPinError(false);
+  }, [pinChallenge, pinInput]);
+
   const activeTransfers = Object.values(transfers);
 
   return (
     <div className="app-root">
-      {/* First-launch name setup — shown instead of the notch */}
+      {/* First-launch name + avatar setup */}
       <AnimatePresence>
         {needsNameSetup && <NameSetup onSave={handleNameSave} />}
       </AnimatePresence>
@@ -210,6 +289,7 @@ export default function App() {
       {!needsNameSetup && (
         <DropNotch
           deviceName={deviceInfo?.name}
+          avatar={deviceInfo?.avatar}
           peers={peers}
           droppedFile={droppedFile}
           onFileDrop={handleFileDrop}
@@ -219,9 +299,26 @@ export default function App() {
           onPing={handlePing}
           transfers={activeTransfers}
           showPicker={showPicker}
+          showSettings={showSettings}
+          settingsContent={
+            <Settings
+              deviceName={deviceInfo?.name}
+              avatar={deviceInfo?.avatar}
+              pinEnabled={pinEnabled}
+              pin={currentPin}
+              onTogglePin={handleTogglePin}
+              onRefreshPin={handleRefreshPin}
+              saveFolder={saveFolder}
+              onPickSaveFolder={handlePickSaveFolder}
+              onClearSaveFolder={handleClearSaveFolder}
+              onClose={() => setShowSettings(false)}
+            />
+          }
+          onOpenSettings={() => { setShowSettings(true); setShowPicker(false); }}
         />
       )}
 
+      {/* Incoming transfer prompt */}
       <AnimatePresence>
         {incomingRequest && (
           <IncomingPrompt
@@ -229,6 +326,50 @@ export default function App() {
             onAccept={handleAccept}
             onDecline={handleDecline}
           />
+        )}
+      </AnimatePresence>
+
+      {/* PIN entry dialog (sender side — receiver requires a PIN) */}
+      <AnimatePresence>
+        {pinChallenge && (
+          <motion.div
+            className="pin-overlay"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+          >
+            <div className="pin-icon">🔐</div>
+            <div className="pin-title">PIN Required</div>
+            <p className="pin-subtitle">The receiver requires a PIN to accept this transfer.</p>
+            <form onSubmit={handlePinSubmit} className="pin-form">
+              <input
+                className={`pin-input ${pinError ? 'has-error' : ''}`}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                placeholder="000000"
+                value={pinInput}
+                onChange={(e) => {
+                  setPinError(false);
+                  setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6));
+                }}
+                autoFocus
+              />
+              {pinError && <span className="pin-error-msg">Wrong PIN — try again</span>}
+              <div className="pin-actions">
+                <button type="button" className="pin-cancel-btn"
+                  onClick={() => { setPinChallenge(null); setPinInput(''); setPinError(false); }}>
+                  Cancel
+                </button>
+                <button type="submit" className="pin-submit-btn"
+                  disabled={pinInput.length !== 6}>
+                  Submit
+                </button>
+              </div>
+            </form>
+          </motion.div>
         )}
       </AnimatePresence>
 

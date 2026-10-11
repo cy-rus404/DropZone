@@ -21,11 +21,25 @@ const { v4: uuidv4 } = require('uuid');
  *   filename    → original filename
  *   fileSize    → total bytes
  *
- * Emits:
- *   'incoming-request'   → { transferId, senderName, filename, fileSize }
+ * Emits (receiver side):
+ *   'incoming-request'   → { transferId, senderName, filename, fileSize, requiresPin }
  *   'transfer-progress'  → { transferId, filename, received, total, percent }
  *   'transfer-complete'  → { transferId, filename, savePath, sent: bool }
  *   'transfer-error'     → { transferId, error }
+ *
+ * Emits (sender side):
+ *   'pin-required'       → { transferId }
+ *   'transfer-error'     → { transferId, error: 'wrong-pin' | 'declined' | ... }
+ *
+ * PIN flow (receiver has PIN enabled):
+ *   1. Sender connects and sends transfer-request header as normal.
+ *   2. Receiver sees pinEnabled=true → immediately writes { type: 'pin-required' } back to sender.
+ *   3. Sender receives 'pin-required', emits 'pin-required' event so UI shows PIN dialog.
+ *   4. UI calls submitPin(transferId, pin) → socket writes { type: 'pin-response', pin }.
+ *   5. Receiver validates:
+ *        Wrong → writes { type: 'pin-wrong' }, destroys socket, emits transfer-error.
+ *        Correct → proceeds to emit 'incoming-request', normal accept/decline flow.
+ *   6. If no pin-response arrives within 30 s, receiver destroys socket.
  */
 class TransferService extends EventEmitter {
   constructor(deviceId, deviceName, port) {
@@ -35,33 +49,40 @@ class TransferService extends EventEmitter {
     this.port = port;
     this.server = null;
 
+    // PIN state — updated by main.js via setPin()
+    this.pinEnabled = false;
+    this.currentPin = null;
+
     // Active incoming transfers waiting for user response
-    // transferId → { resolve, reject, socket, header }
+    // transferId → { resolve, reject, socket, header, initialData }
     this.pendingIncoming = new Map();
+
+    // Transfers currently waiting for the sender to supply the PIN
+    // transferId → { socket, header, initialData, timer }
+    this.pendingPinCheck = new Map();
 
     // Active incoming transfers being received
     // transferId → { socket, header, savePath, writeStream, received }
     this.activeReceiving = new Map();
 
     // Active outgoing transfers
-    // transferId → { socket }
+    // transferId → { socket, filePath, resolve, reject }
     this.activeSending = new Map();
   }
 
-  async start() {
-    return new Promise((resolve, reject) => {
-      this.server = net.createServer((socket) => this._handleIncomingConnection(socket));
+  // ─── PIN Management ────────────────────────────────────────────────────────
 
-      this.server.on('error', (err) => {
-        console.error('[Transfer] Server error:', err);
-        reject(err);
-      });
-
-      this.server.listen(this.port, '0.0.0.0', () => {
-        console.log(`[Transfer] Listening on port ${this.port}`);
-        resolve();
-      });
-    });
+  /**
+   * Called by main.js whenever the user enables/disables PIN protection or
+   * changes their PIN in settings.
+   *
+   * @param {string|null} pin     - The 6-digit PIN string, or null to clear.
+   * @param {boolean}     enabled - Whether PIN protection is active.
+   */
+  setPin(pin, enabled) {
+    this.pinEnabled = !!enabled;
+    this.currentPin = enabled ? pin : null;
+    console.log(`[Transfer] PIN protection ${this.pinEnabled ? 'enabled' : 'disabled'}`);
   }
 
   // ─── Sending ───────────────────────────────────────────────────────────────
@@ -107,7 +128,7 @@ class TransferService extends EventEmitter {
         this.activeSending.delete(transferId);
       });
 
-      // 30-second timeout waiting for accept/decline
+      // 30-second timeout waiting for accept/decline (or pin-required acknowledgement)
       socket.setTimeout(30000, () => {
         if (this.activeSending.has(transferId)) {
           socket.destroy();
@@ -118,17 +139,53 @@ class TransferService extends EventEmitter {
     });
   }
 
+  /**
+   * Called by the sender UI after the user types their PIN into the dialog.
+   * Locates the active sending socket and writes a pin-response message.
+   *
+   * @param {string} transferId
+   * @param {string} pin  - The 6-digit PIN the user entered.
+   */
+  submitPin(transferId, pin) {
+    const entry = this.activeSending.get(transferId);
+    if (!entry) {
+      console.warn('[Transfer] submitPin: no active sending entry for', transferId);
+      return;
+    }
+
+    const msg = JSON.stringify({ type: 'pin-response', pin });
+    entry.socket.write(msg);
+    console.log(`[Transfer] PIN response submitted for transfer ${transferId}`);
+  }
+
   _handleSenderData(transferId, data) {
     try {
       const response = JSON.parse(data.toString('utf8'));
       const entry = this.activeSending.get(transferId);
       if (!entry) return;
 
-      if (response.type === 'transfer-accept') {
+      if (response.type === 'pin-required') {
+        // Receiver requires a PIN before showing accept/decline.
+        // Disable the connection timeout while we wait for the user to type their PIN —
+        // the UI will call submitPin() which writes pin-response back.
+        console.log(`[Transfer] Receiver requires PIN for transfer ${transferId}`);
+        entry.socket.setTimeout(0);
+        this.emit('pin-required', { transferId });
+
+      } else if (response.type === 'pin-wrong') {
+        // The PIN we submitted was rejected.
+        console.warn(`[Transfer] Wrong PIN for transfer ${transferId}`);
+        entry.socket.destroy();
+        this.activeSending.delete(transferId);
+        entry.reject(new Error('wrong-pin'));
+        this.emit('transfer-error', { transferId, error: 'wrong-pin' });
+
+      } else if (response.type === 'transfer-accept') {
         console.log(`[Transfer] Peer accepted transfer ${transferId}`);
-        // Clear the timeout by resetting it to 0
+        // Clear any remaining timeout
         entry.socket.setTimeout(0);
         this._streamFile(transferId, entry);
+
       } else if (response.type === 'transfer-decline') {
         console.log(`[Transfer] Peer declined transfer ${transferId}`);
         entry.socket.destroy();
@@ -187,7 +244,6 @@ class TransferService extends EventEmitter {
   // ─── Receiving ─────────────────────────────────────────────────────────────
 
   _handleIncomingConnection(socket) {
-    let headerBuffer = null;
     let headerLength = 0;
     let headerParsed = false;
     let transferId = null;
@@ -213,8 +269,9 @@ class TransferService extends EventEmitter {
           transferId = header.transferId;
 
           if (header.type === 'transfer-request') {
-            this._onTransferRequest(socket, header, rawBuf);
+            const initialData = rawBuf;
             rawBuf = Buffer.alloc(0); // reset; further data handled by active receiver
+            this._handlePinChallenge(socket, header, initialData);
           }
         } catch (err) {
           console.error('[Transfer] Failed to parse incoming header:', err.message);
@@ -224,36 +281,172 @@ class TransferService extends EventEmitter {
         // Stream remaining data to the write stream
         this._writeChunk(transferId, rawBuf);
         rawBuf = Buffer.alloc(0);
+      } else if (transferId && this.pendingPinCheck.has(transferId)) {
+        // Data arrived while we are waiting for the pin-response message.
+        // Accumulate it — it will be the pin-response JSON.
+        // (handled inline in _handlePinChallenge via the socket 'data' listener added there)
       }
     });
 
     socket.on('error', (err) => {
       console.error('[Transfer] Incoming socket error:', err.message);
-      if (transferId && this.activeReceiving.has(transferId)) {
-        const entry = this.activeReceiving.get(transferId);
-        entry.writeStream && entry.writeStream.destroy();
-        this.activeReceiving.delete(transferId);
-        this.emit('transfer-error', { transferId, error: err.message });
+
+      if (transferId) {
+        // Clean up PIN check state if present
+        if (this.pendingPinCheck.has(transferId)) {
+          const pinEntry = this.pendingPinCheck.get(transferId);
+          clearTimeout(pinEntry.timer);
+          this.pendingPinCheck.delete(transferId);
+        }
+
+        if (this.activeReceiving.has(transferId)) {
+          const entry = this.activeReceiving.get(transferId);
+          entry.writeStream && entry.writeStream.destroy();
+          this.activeReceiving.delete(transferId);
+          this.emit('transfer-error', { transferId, error: err.message });
+        }
       }
     });
 
     socket.on('close', () => {
-      if (transferId && this.activeReceiving.has(transferId)) {
-        const entry = this.activeReceiving.get(transferId);
-        if (entry.received >= entry.header.fileSize) {
-          // Already completed
-          return;
+      if (transferId) {
+        // Clean up a pending PIN check if the sender disconnected early
+        if (this.pendingPinCheck.has(transferId)) {
+          const pinEntry = this.pendingPinCheck.get(transferId);
+          clearTimeout(pinEntry.timer);
+          this.pendingPinCheck.delete(transferId);
         }
-        entry.writeStream && entry.writeStream.destroy();
-        this.activeReceiving.delete(transferId);
-        this.emit('transfer-error', {
-          transferId,
-          error: 'Connection closed before transfer completed',
-        });
+
+        if (this.activeReceiving.has(transferId)) {
+          const entry = this.activeReceiving.get(transferId);
+          if (entry.received >= entry.header.fileSize) {
+            // Already completed
+            return;
+          }
+          entry.writeStream && entry.writeStream.destroy();
+          this.activeReceiving.delete(transferId);
+          this.emit('transfer-error', {
+            transferId,
+            error: 'Connection closed before transfer completed',
+          });
+        }
       }
     });
   }
 
+  /**
+   * Called as soon as the transfer-request header has been parsed.
+   *
+   * If PIN protection is disabled, delegates immediately to _onTransferRequest.
+   * If PIN protection is enabled:
+   *   - Sends { type: 'pin-required' } back to the sender.
+   *   - Waits up to 30 s for a { type: 'pin-response', pin } message on the socket.
+   *   - Validates the PIN:
+   *       Correct  → proceeds to _onTransferRequest (normal accept/decline flow).
+   *       Wrong    → sends { type: 'pin-wrong' }, destroys the socket.
+   *   - If the timeout fires before a response arrives, destroys the socket.
+   *
+   * @param {net.Socket} socket
+   * @param {object}     header      - Parsed transfer-request header.
+   * @param {Buffer}     initialData - Any bytes that arrived alongside the header.
+   */
+  _handlePinChallenge(socket, header, initialData) {
+    if (!this.pinEnabled) {
+      // No PIN required — proceed directly to the normal flow.
+      this._onTransferRequest(socket, header, initialData);
+      return;
+    }
+
+    const { transferId, senderName } = header;
+    console.log(
+      `[Transfer] PIN required for transfer ${transferId} from ${senderName}`
+    );
+
+    // Tell the sender they must supply a PIN.
+    socket.write(JSON.stringify({ type: 'pin-required' }));
+
+    // Accumulate data arriving on this socket for the pin-response message.
+    let pinResponseBuf = Buffer.alloc(0);
+
+    // 30-second timeout — if no valid pin-response arrives, close the connection.
+    const timer = setTimeout(() => {
+      if (this.pendingPinCheck.has(transferId)) {
+        console.warn(
+          `[Transfer] PIN challenge timed out for transfer ${transferId}`
+        );
+        this.pendingPinCheck.delete(transferId);
+        socket.destroy();
+        this.emit('transfer-error', { transferId, error: 'pin-timeout' });
+      }
+    }, 30000);
+
+    this.pendingPinCheck.set(transferId, { socket, header, initialData, timer });
+
+    // Listen for the pin-response on this socket.
+    // We attach a one-shot 'data' listener here so we can capture the response
+    // without interfering with the outer connection handler's rawBuf accumulation.
+    const onPinData = (chunk) => {
+      pinResponseBuf = Buffer.concat([pinResponseBuf, chunk]);
+
+      let parsed;
+      try {
+        parsed = JSON.parse(pinResponseBuf.toString('utf8'));
+      } catch (_) {
+        // Incomplete JSON — wait for more data.
+        return;
+      }
+
+      // We have a complete JSON message; remove this listener regardless of outcome.
+      socket.removeListener('data', onPinData);
+
+      const pinEntry = this.pendingPinCheck.get(transferId);
+      if (!pinEntry) return; // already cleaned up (e.g. timeout fired)
+
+      if (parsed.type !== 'pin-response') {
+        // Unexpected message type — treat as wrong PIN.
+        console.warn(
+          `[Transfer] Expected pin-response but got '${parsed.type}' for ${transferId}`
+        );
+        clearTimeout(pinEntry.timer);
+        this.pendingPinCheck.delete(transferId);
+        socket.write(JSON.stringify({ type: 'pin-wrong' }));
+        socket.destroy();
+        this.emit('transfer-error', { transferId, error: 'wrong-pin' });
+        return;
+      }
+
+      const submittedPin = parsed.pin;
+
+      if (submittedPin !== this.currentPin) {
+        console.warn(
+          `[Transfer] Wrong PIN submitted for transfer ${transferId}`
+        );
+        clearTimeout(pinEntry.timer);
+        this.pendingPinCheck.delete(transferId);
+        socket.write(JSON.stringify({ type: 'pin-wrong' }));
+        socket.destroy();
+        this.emit('transfer-error', { transferId, error: 'wrong-pin' });
+        return;
+      }
+
+      // Correct PIN — proceed to the normal request flow.
+      console.log(`[Transfer] Correct PIN for transfer ${transferId}; proceeding`);
+      clearTimeout(pinEntry.timer);
+      this.pendingPinCheck.delete(transferId);
+      this._onTransferRequest(socket, header, initialData);
+    };
+
+    socket.on('data', onPinData);
+  }
+
+  /**
+   * Called once a transfer-request has passed any PIN check (or no PIN is required).
+   * Stores the pending transfer and notifies the UI to show accept/decline.
+   *
+   * @param {net.Socket} socket
+   * @param {object}     header
+   * @param {Buffer}     initialData
+   */
   _onTransferRequest(socket, header, initialData) {
     const { transferId, senderName, filename, fileSize } = header;
     console.log(
@@ -263,8 +456,14 @@ class TransferService extends EventEmitter {
     // Store the pending socket so we can respond later
     this.pendingIncoming.set(transferId, { socket, header, initialData });
 
-    // Notify the UI
-    this.emit('incoming-request', { transferId, senderName, filename, fileSize });
+    // Notify the UI — include requiresPin so the UI knows PIN was already verified
+    this.emit('incoming-request', {
+      transferId,
+      senderName,
+      filename,
+      fileSize,
+      requiresPin: this.pinEnabled,
+    });
   }
 
   respondToTransfer(transferId, accepted, savePath) {
@@ -353,11 +552,35 @@ class TransferService extends EventEmitter {
     socket.write(Buffer.concat([lengthBuf, headerBytes]));
   }
 
+  async start() {
+    return new Promise((resolve, reject) => {
+      this.server = net.createServer((socket) => this._handleIncomingConnection(socket));
+
+      this.server.on('error', (err) => {
+        console.error('[Transfer] Server error:', err);
+        reject(err);
+      });
+
+      this.server.listen(this.port, '0.0.0.0', () => {
+        console.log(`[Transfer] Listening on port ${this.port}`);
+        resolve();
+      });
+    });
+  }
+
   stop() {
     if (this.server) {
       this.server.close();
       this.server = null;
     }
+
+    // Clear any pending PIN checks
+    for (const [, entry] of this.pendingPinCheck) {
+      clearTimeout(entry.timer);
+      entry.socket && entry.socket.destroy();
+    }
+    this.pendingPinCheck.clear();
+
     // Close any active connections
     for (const [, entry] of this.activeSending) {
       entry.socket && entry.socket.destroy();
