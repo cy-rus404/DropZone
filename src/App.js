@@ -26,7 +26,7 @@ export default function App() {
       setDeviceInfo(info);
       if (info.needsNameSetup) {
         setNeedsNameSetup(true);
-        api.resizeWindow(420, 320);
+        api.resizeWindow(400, 320);
         return; // don't load peers until name is set
       }
       const initialPeers = await api.getPeers();
@@ -37,7 +37,7 @@ export default function App() {
 
     api.onIncomingTransfer((info) => {
       setIncomingRequest(info);
-      api.resizeWindow(420, 280);
+      api.resizeWindow(400, 280);
     });
 
     api.onTransferProgress((progress) => {
@@ -59,7 +59,7 @@ export default function App() {
       );
       setTimeout(() => {
         setTransfers((prev) => { const n = { ...prev }; delete n[info.transferId]; return n; });
-        api.resizeWindow(420, 36);
+        api.resizeWindow(400, 36);
       }, 3000);
     });
 
@@ -73,7 +73,7 @@ export default function App() {
       );
       setTimeout(() => {
         setTransfers((prev) => { const n = { ...prev }; delete n[info.transferId]; return n; });
-        api.resizeWindow(420, 36);
+        api.resizeWindow(400, 36);
       }, 3000);
     });
 
@@ -94,13 +94,18 @@ export default function App() {
   useEffect(() => {
     if (needsNameSetup) return;
     const activeTransfers = Object.values(transfers);
+    // Window must be slightly wider than the pill (380px) so the pill border/
+    // rounded corners aren't clipped, and a few px taller so the bottom edge
+    // shows cleanly on every platform.
+    const W = 400;   // pill is 380px — 10px breathing room each side
+    const PAD = 12;  // extra bottom padding so content isn't cut off
     if (showPicker) {
       const peerH = peers.length === 0 ? 80 : Math.min(peers.length, 4) * 54 + 8;
-      api.resizeWindow(420, 52 + 1 + peerH + 44 + 20);
+      api.resizeWindow(W, 52 + 1 + peerH + 44 + PAD);
     } else if (activeTransfers.length > 0) {
-      api.resizeWindow(420, 52 + 1 + activeTransfers.length * 54 + 12 + 20);
+      api.resizeWindow(W, 52 + 1 + activeTransfers.length * 54 + 12 + PAD);
     } else if (!incomingRequest) {
-      api.resizeWindow(420, 36); // collapsed pill
+      api.resizeWindow(W, 36 + PAD); // collapsed pill
     }
   }, [showPicker, transfers, peers.length, incomingRequest, needsNameSetup]);
 
@@ -118,7 +123,7 @@ export default function App() {
     setNeedsNameSetup(false);
     const initialPeers = await api.getPeers();
     setPeers(initialPeers);
-    api.resizeWindow(420, 36);
+    api.resizeWindow(400, 36);
   }, []);
 
   // ── File drop ──────────────────────────────────────────────────────────────

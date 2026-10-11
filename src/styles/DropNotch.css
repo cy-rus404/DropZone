@@ -11,8 +11,7 @@
   border-top: none;
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
-  /* Single clean shadow — no card bleed */
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: none;
   overflow: hidden;
   cursor: default;
   -webkit-app-region: drag;
@@ -27,9 +26,7 @@
 
 .notch.drag-over {
   border-color: var(--accent);
-  box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.4),
-    0 0 20px var(--accent-glow);
+  box-shadow: 0 0 20px var(--accent-glow);
 }
 
 /* ── Collapsed state: just a small dot with icon ─── */
