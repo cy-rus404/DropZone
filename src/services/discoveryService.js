@@ -11,6 +11,7 @@ const SERVICE_PROTOCOL = 'tcp';
 const BROADCAST_PORT = 54320;          // separate UDP port for discovery beacons
 const BEACON_INTERVAL_MS = 5000;       // how often we broadcast our presence
 const REBROWSE_INTERVAL_MS = 15000;    // how often we restart mDNS browse on Windows
+const PEER_EXPIRY_MS = 16000;          // remove peer if no beacon for ~3 intervals
 
 /**
  * DiscoveryService
@@ -43,6 +44,7 @@ class DiscoveryService extends EventEmitter {
     // UDP broadcast
     this.udpSocket = null;
     this._beaconTimer = null;
+    this._expiryTimer = null;
 
     this.peers = new Map(); // peerId → peer info
   }
@@ -79,6 +81,7 @@ class DiscoveryService extends EventEmitter {
 
   stop() {
     console.log('[Discovery] Shutting down...');
+    this._sendGoodbye();
     this._stopMDNS();
     this._stopUDPBeacon();
   }
@@ -221,6 +224,20 @@ class DiscoveryService extends EventEmitter {
 
       // Broadcast our presence periodically
       this._beaconTimer = setInterval(() => this._sendBeacon(), BEACON_INTERVAL_MS);
+
+      // Expire peers that haven't sent a beacon recently (handles crashes/force-quits)
+      this._expiryTimer = setInterval(() => {
+        const now = Date.now();
+        let changed = false;
+        for (const [id, peer] of this.peers) {
+          if (peer.via === 'udp' && (now - peer.lastSeen) > PEER_EXPIRY_MS) {
+            console.log(`[Discovery] Peer expired (no beacon): ${peer.name}`);
+            this.peers.delete(id);
+            changed = true;
+          }
+        }
+        if (changed) this.emit('peers-updated', this.getPeers());
+      }, BEACON_INTERVAL_MS);
     } catch (err) {
       console.error('[Discovery] UDP beacon start error:', err.message);
     }
@@ -231,10 +248,26 @@ class DiscoveryService extends EventEmitter {
       clearInterval(this._beaconTimer);
       this._beaconTimer = null;
     }
+    if (this._expiryTimer) {
+      clearInterval(this._expiryTimer);
+      this._expiryTimer = null;
+    }
     if (this.udpSocket) {
       try { this.udpSocket.close(); } catch (_) {}
       this.udpSocket = null;
     }
+  }
+
+  _sendGoodbye() {
+    if (!this.udpSocket) return;
+    const packet = Buffer.from(JSON.stringify({
+      type: 'dropzone-goodbye',
+      id: this.deviceId,
+    }));
+    // Send synchronously-ish — best effort before socket closes
+    try {
+      this.udpSocket.send(packet, 0, packet.length, BROADCAST_PORT, '255.255.255.255', () => {});
+    } catch (_) {}
   }
 
   _sendBeacon() {
@@ -266,6 +299,13 @@ class DiscoveryService extends EventEmitter {
           platform: data.platform || 'unknown',
           via: 'udp',
         });
+      } else if (data.type === 'dropzone-goodbye') {
+        if (!data.id || data.id === this.deviceId) return;
+        if (this.peers.has(data.id)) {
+          console.log(`[Discovery] Peer said goodbye: ${this.peers.get(data.id).name}`);
+          this.peers.delete(data.id);
+          this.emit('peers-updated', this.getPeers());
+        }
       } else if (data.type === 'dropzone-ping') {
         if (data.targetId !== this.deviceId) return;
         console.log(`[Discovery] Ping received from ${data.senderName}`);
@@ -305,6 +345,7 @@ class DiscoveryService extends EventEmitter {
       name: peer.name || 'Unknown Device',
       online: true,
       discoveredAt: existing ? existing.discoveredAt : Date.now(),
+      lastSeen: Date.now(),
     };
 
     // Only emit an update if something meaningful changed
