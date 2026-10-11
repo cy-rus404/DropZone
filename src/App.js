@@ -59,7 +59,7 @@ export default function App() {
       );
       setTimeout(() => {
         setTransfers((prev) => { const n = { ...prev }; delete n[info.transferId]; return n; });
-        api.resizeWindow(420, 110);
+        api.resizeWindow(420, 36);
       }, 3000);
     });
 
@@ -73,7 +73,7 @@ export default function App() {
       );
       setTimeout(() => {
         setTransfers((prev) => { const n = { ...prev }; delete n[info.transferId]; return n; });
-        api.resizeWindow(420, 110);
+        api.resizeWindow(420, 36);
       }, 3000);
     });
 
@@ -95,12 +95,12 @@ export default function App() {
     if (needsNameSetup) return;
     const activeTransfers = Object.values(transfers);
     if (showPicker) {
-      const h = 64 + 16 + Math.min(peers.length, 4) * 56 + 52 + (peers.length === 0 ? 80 : 0);
-      api.resizeWindow(420, Math.max(h, 180));
+      const peerH = peers.length === 0 ? 80 : Math.min(peers.length, 4) * 54 + 8;
+      api.resizeWindow(420, 52 + 1 + peerH + 44 + 20);
     } else if (activeTransfers.length > 0) {
-      api.resizeWindow(420, 64 + activeTransfers.length * 62 + 16);
+      api.resizeWindow(420, 52 + 1 + activeTransfers.length * 54 + 12 + 20);
     } else if (!incomingRequest) {
-      api.resizeWindow(420, 110);
+      api.resizeWindow(420, 36); // collapsed pill
     }
   }, [showPicker, transfers, peers.length, incomingRequest, needsNameSetup]);
 
@@ -118,7 +118,7 @@ export default function App() {
     setNeedsNameSetup(false);
     const initialPeers = await api.getPeers();
     setPeers(initialPeers);
-    api.resizeWindow(420, 110);
+    api.resizeWindow(420, 36);
   }, []);
 
   // ── File drop ──────────────────────────────────────────────────────────────

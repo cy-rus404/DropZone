@@ -29,26 +29,30 @@ function formatBytes(b) {
 
 /**
  * DropNotch
- * A single unified Apple-notch-style pill. Content morphs inside it:
- *   idle → drag-over → file picked → device picker (expanded) → transfer progress
  *
- * No second card underneath. Everything lives inside one shape.
+ * Idle:    Small rounded pill (like a camera cutout) — just a dot at the top
+ * Hover:   Expands to show device name, peer count, drop hint
+ * Active:  Fully expanded to show device picker or transfer progress
  */
 export default function DropNotch({
   deviceName,
   peers,
   droppedFile,
   onFileDrop,
-  onOpenPeers,      // called when user clicks peer badge without a file
+  onOpenPeers,
   onSendTo,
   onCancelPicker,
   onPing,
   transfers,
   showPicker,
 }) {
+  const [isHovered, setIsHovered] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [pingTarget, setPingTarget] = useState(null); // peerId currently being pinged
+  const [pingTarget, setPingTarget] = useState(null);
   const dragCounter = useRef(0);
+
+  const isActive = showPicker || transfers.length > 0 || isDragOver;
+  const isExpanded = isHovered || isActive;
 
   // ── Drag handlers ──────────────────────────────────────────────────────────
   const handleDragEnter = useCallback((e) => {
@@ -84,121 +88,132 @@ export default function DropNotch({
     setTimeout(() => setPingTarget(null), 1200);
   }, [onPing]);
 
-  // ── Determine notch height ─────────────────────────────────────────────────
-  const hasTransfers = transfers.length > 0;
-  const expandedForPicker = showPicker;
-  const expandedForTransfer = hasTransfers && !showPicker;
+  // ── Sizing ─────────────────────────────────────────────────────────────────
+  // Collapsed: small pill  — 120px × 28px
+  // Hovered:   bar          — 380px × 52px
+  // Picker:    tall         — 380px × dynamic
+  // Transfer:  medium       — 380px × dynamic
 
-  // Height tiers: idle=64, file-hover=80, picker=open, transfer=open
-  const pickerHeight = 64 + 16 + Math.min(peers.length, 4) * 56 + 52 + (peers.length === 0 ? 80 : 0);
-  const transferHeight = 64 + transfers.length * 62;
-
-  const notchHeight = expandedForPicker
-    ? pickerHeight
-    : expandedForTransfer
-    ? transferHeight
-    : isDragOver
+  const pickerContentH = peers.length === 0
     ? 80
-    : 64;
+    : Math.min(peers.length, 4) * 54 + 8;
+
+  const expandedWidth = isExpanded ? 380 : 120;
+  const expandedHeight = isExpanded
+    ? showPicker
+      ? 52 + 1 + pickerContentH + 44   // bar + divider + list + footer
+      : transfers.length > 0
+      ? 52 + 1 + transfers.length * 54 + 12
+      : 52
+    : 28;
+
+  const spring = { type: 'spring', stiffness: 380, damping: 32 };
 
   return (
     <motion.div
-      className={`notch ${isDragOver ? 'drag-over' : ''}`}
+      className={`notch ${isDragOver ? 'drag-over' : ''} ${isExpanded ? 'expanded' : ''}`}
+      animate={{ width: expandedWidth, height: expandedHeight, borderRadius: isExpanded ? 18 : 14 }}
+      transition={spring}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
-      animate={{ height: notchHeight }}
-      transition={{ type: 'spring', stiffness: 420, damping: 36 }}
+      style={{ originX: 0.5, originY: 0 }}
     >
-      {/* ── Glow ── */}
+      {/* ── Collapsed dot indicator (visible when not expanded) ── */}
       <AnimatePresence>
-        {isDragOver && (
-          <motion.div className="notch-glow"
+        {!isExpanded && (
+          <motion.div className="notch-dot"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          />
+            transition={{ duration: 0.12 }}>
+            <span className="notch-dot-icon">🌀</span>
+            {peers.length > 0 && (
+              <span className="notch-dot-badge">{peers.length}</span>
+            )}
+          </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── Always-visible top bar ── */}
-      <div className="notch-bar">
-        {/* Left: logo + name */}
-        <div className="notch-left">
-          <motion.span
-            className="logo"
-            animate={{ rotate: isDragOver ? [0, -12, 12, -6, 6, 0] : 0, scale: isDragOver ? 1.25 : 1 }}
-            transition={{ duration: 0.4 }}
-          >🌀</motion.span>
-          <div className="device-info">
-            <span className="app-name">DropZone</span>
-            <span className="device-name">{deviceName || '—'}</span>
-          </div>
-        </div>
-
-        {/* Center: context label */}
-        <div className="notch-center">
-          <AnimatePresence mode="wait">
-            {droppedFile && !showPicker ? (
-              <motion.div key="file" className="file-pill"
-                initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.85 }} transition={{ duration: 0.18 }}>
-                <span className="file-pill-icon">{fileIcon(droppedFile.name)}</span>
-                <span className="file-pill-name">{droppedFile.name}</span>
-                <span className="file-pill-size">{formatBytes(droppedFile.size)}</span>
-              </motion.div>
-            ) : isDragOver ? (
-              <motion.span key="drop" className="hint-active"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                Release to drop
-              </motion.span>
-            ) : showPicker ? (
-              <motion.span key="pick" className="hint-muted"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                Choose a device
-              </motion.span>
-            ) : hasTransfers ? (
-              <motion.span key="xfr" className="hint-muted"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                Transferring…
-              </motion.span>
-            ) : (
-              <motion.span key="idle" className="hint-idle"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                Drop a file to send
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Right: peer count — clickable to open peer list */}
-        <div className="notch-right">
-          <motion.button
-            className={`peer-badge ${peers.length > 0 ? 'has-peers' : ''}`}
-            key={peers.length}
-            animate={{ scale: peers.length > 0 ? [1, 1.18, 1] : 1 }}
-            transition={{ duration: 0.3 }}
-            onClick={() => !showPicker && onOpenPeers()}
-            whileHover={{ scale: 1.06 }}
-            whileTap={{ scale: 0.94 }}
-            title="View devices"
-          >
-            <span className="peer-count">{peers.length}</span>
-            <span className="peer-label">{peers.length === 1 ? 'device' : 'devices'}</span>
-          </motion.button>
-        </div>
-      </div>
-
-      {/* ── Expanded: Device Picker ── */}
+      {/* ── Expanded bar ── */}
       <AnimatePresence>
-        {showPicker && (
+        {isExpanded && (
+          <motion.div className="notch-bar"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.14 }}>
+
+            {/* Left: logo + name */}
+            <div className="notch-left">
+              <motion.span className="logo"
+                animate={{ rotate: isDragOver ? [0, -12, 12, -6, 6, 0] : 0 }}
+                transition={{ duration: 0.4 }}>🌀</motion.span>
+              <div className="device-info">
+                <span className="app-name">DropZone</span>
+                <span className="device-name">{deviceName || '—'}</span>
+              </div>
+            </div>
+
+            {/* Center: context hint */}
+            <div className="notch-center">
+              <AnimatePresence mode="wait">
+                {droppedFile && !showPicker ? (
+                  <motion.div key="file" className="file-pill"
+                    initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.85 }} transition={{ duration: 0.15 }}>
+                    <span className="file-pill-icon">{fileIcon(droppedFile.name)}</span>
+                    <span className="file-pill-name">{droppedFile.name}</span>
+                    <span className="file-pill-size">{formatBytes(droppedFile.size)}</span>
+                  </motion.div>
+                ) : isDragOver ? (
+                  <motion.span key="drop" className="hint-active"
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    Release to drop
+                  </motion.span>
+                ) : showPicker ? (
+                  <motion.span key="pick" className="hint-dim"
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    Choose a device
+                  </motion.span>
+                ) : transfers.length > 0 ? (
+                  <motion.span key="xfr" className="hint-dim"
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    Transferring…
+                  </motion.span>
+                ) : (
+                  <motion.span key="idle" className="hint-idle"
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    Drop a file to send
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Right: peer badge */}
+            <motion.button
+              className={`peer-badge ${peers.length > 0 ? 'has-peers' : ''}`}
+              onClick={() => !showPicker && onOpenPeers()}
+              whileHover={{ scale: 1.07 }}
+              whileTap={{ scale: 0.93 }}
+              title="View devices"
+            >
+              <span className="peer-count">{peers.length}</span>
+              <span className="peer-label">{peers.length === 1 ? 'dev' : 'devs'}</span>
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Device Picker ── */}
+      <AnimatePresence>
+        {showPicker && isExpanded && (
           <motion.div className="notch-expanded"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}>
+            transition={{ duration: 0.12 }}>
             <div className="divider" />
-
             {peers.length === 0 ? (
               <div className="no-peers">
-                <span className="no-peers-icon">🔍</span>
+                <span>🔍</span>
                 <p>No devices found</p>
                 <p className="no-peers-hint">Open DropZone on another device</p>
               </div>
@@ -206,14 +221,12 @@ export default function DropNotch({
               <div className="peer-list">
                 {peers.map((peer, i) => (
                   <motion.div key={peer.id} className="peer-row"
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
+                    initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.04, type: 'spring', stiffness: 400, damping: 28 }}>
                     <button
                       className={`peer-send-btn ${!droppedFile ? 'ping-only' : ''}`}
                       onClick={() => droppedFile && onSendTo(peer.id)}
                       disabled={!droppedFile}
-                      title={droppedFile ? `Send to ${peer.name}` : peer.name}
                     >
                       <span className="peer-avatar">{PLATFORM_ICONS[peer.platform] || '💻'}</span>
                       <span className="peer-name">{peer.name}</span>
@@ -223,19 +236,18 @@ export default function DropNotch({
                     <motion.button
                       className={`ping-btn ${pingTarget === peer.id ? 'pinging' : ''}`}
                       onClick={(e) => handlePing(e, peer.id)}
-                      whileTap={{ scale: 0.85 }}
-                      title="Ping device"
+                      whileTap={{ scale: 0.82 }}
+                      title="Ping"
                     >
                       <motion.span
-                        animate={pingTarget === peer.id ? { scale: [1, 1.5, 1], rotate: [0, -20, 20, 0] } : {}}
-                        transition={{ duration: 0.5 }}
-                      >🔔</motion.span>
+                        animate={pingTarget === peer.id
+                          ? { scale: [1, 1.5, 1], rotate: [0, -20, 20, 0] } : {}}
+                        transition={{ duration: 0.45 }}>🔔</motion.span>
                     </motion.button>
                   </motion.div>
                 ))}
               </div>
             )}
-
             <div className="picker-footer">
               <button className="cancel-btn" onClick={onCancelPicker}>Cancel</button>
             </div>
@@ -243,17 +255,15 @@ export default function DropNotch({
         )}
       </AnimatePresence>
 
-      {/* ── Expanded: Transfer progress ── */}
+      {/* ── Transfer progress ── */}
       <AnimatePresence>
-        {hasTransfers && !showPicker && (
+        {transfers.length > 0 && !showPicker && isExpanded && (
           <motion.div className="notch-expanded"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}>
+            transition={{ duration: 0.12 }}>
             <div className="divider" />
             <div className="transfer-list">
-              {transfers.map((t) => (
-                <TransferRow key={t.transferId} transfer={t} />
-              ))}
+              {transfers.map((t) => <TransferRow key={t.transferId} transfer={t} />)}
             </div>
           </motion.div>
         )}
@@ -266,15 +276,14 @@ function TransferRow({ transfer }) {
   const { filename, percent = 0, direction, status } = transfer;
   const isComplete = status === 'complete';
   const isError = status === 'error';
-  const isSending = direction === 'sending';
 
   return (
     <motion.div className="transfer-row"
-      initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -6 }} transition={{ type: 'spring', stiffness: 380, damping: 28 }}>
+      initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -5 }}>
       <div className="transfer-row-top">
-        <span className={`xfr-badge ${isSending ? 'send' : 'recv'}`}>
-          {isSending ? '↑' : '↓'}
+        <span className={`xfr-badge ${direction === 'sending' ? 'send' : 'recv'}`}>
+          {direction === 'sending' ? '↑' : '↓'}
         </span>
         <span className="xfr-name" title={filename}>{filename}</span>
         <span className="xfr-pct">
@@ -291,8 +300,7 @@ function TransferRow({ transfer }) {
         {!isComplete && !isError && (
           <motion.div className="xfr-shimmer"
             animate={{ x: ['-100%', '200%'] }}
-            transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }}
-          />
+            transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }} />
         )}
       </div>
     </motion.div>

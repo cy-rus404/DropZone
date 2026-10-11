@@ -66,7 +66,7 @@ function createMainWindow() {
 
   mainWindow = new BrowserWindow({
     width: 420,
-    height: 110,
+    height: 36,
     x: Math.floor(screenWidth / 2) - 210,
     y: 0,
     frame: false,
@@ -74,7 +74,7 @@ function createMainWindow() {
     alwaysOnTop: true,
     resizable: false,
     skipTaskbar: false,
-    hasShadow: true,
+    hasShadow: false,
     vibrancy: 'under-window',
     visualEffectState: 'active',
     webPreferences: {
