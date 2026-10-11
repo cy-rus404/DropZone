@@ -26,7 +26,7 @@ export default function App() {
       setDeviceInfo(info);
       if (info.needsNameSetup) {
         setNeedsNameSetup(true);
-        api.resizeWindow(400, 320);
+        api.resizeWindow(400, 380);
         return; // don't load peers until name is set
       }
       const initialPeers = await api.getPeers();

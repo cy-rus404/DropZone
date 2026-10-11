@@ -153,7 +153,6 @@ class DiscoveryService extends EventEmitter {
       const txt = service.txt || {};
       const peerId = txt.id;
       if (!peerId || peerId === this.deviceId) return;
-      if (this.peers.has(peerId)) return;
 
       let rawHost =
         (service.addresses && service.addresses.find((a) => /^\d{1,3}(\.\d{1,3}){3}$/.test(a))) ||
@@ -243,7 +242,7 @@ class DiscoveryService extends EventEmitter {
     const beacon = Buffer.from(JSON.stringify({
       type: 'dropzone-beacon',
       id: this.deviceId,
-      name: this.deviceName,
+      name: this.deviceName || 'Unknown Device',
       port: this.port,
       platform: process.platform,
     }));
@@ -258,10 +257,10 @@ class DiscoveryService extends EventEmitter {
       const data = JSON.parse(msg.toString('utf8'));
       if (data.type === 'dropzone-beacon') {
         if (!data.id || data.id === this.deviceId) return;
-        if (this.peers.has(data.id)) return;
+        // Always update — name or host may have changed since first discovery
         this._addPeer({
           id: data.id,
-          name: data.name,
+          name: data.name || 'Unknown Device',
           host: rinfo.address,
           port: data.port,
           platform: data.platform || 'unknown',
@@ -300,14 +299,26 @@ class DiscoveryService extends EventEmitter {
   // ─── Shared peer management ────────────────────────────────────────────────
 
   _addPeer(peer) {
+    const existing = this.peers.get(peer.id);
     const entry = {
       ...peer,
+      name: peer.name || 'Unknown Device',
       online: true,
-      discoveredAt: Date.now(),
+      discoveredAt: existing ? existing.discoveredAt : Date.now(),
     };
+
+    // Only emit an update if something meaningful changed
+    const changed = !existing
+      || existing.name !== entry.name
+      || existing.host !== entry.host
+      || existing.port !== entry.port;
+
     this.peers.set(peer.id, entry);
-    console.log(`[Discovery] Peer found (${peer.via}): ${peer.name} @ ${peer.host}:${peer.port}`);
-    this.emit('peers-updated', this.getPeers());
+
+    if (changed) {
+      console.log(`[Discovery] Peer ${existing ? 'updated' : 'found'} (${peer.via}): ${entry.name} @ ${entry.host}:${entry.port}`);
+      this.emit('peers-updated', this.getPeers());
+    }
   }
 
   getPeers() {
