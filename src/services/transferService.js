@@ -158,18 +158,25 @@ class TransferService extends EventEmitter {
 
   /**
    * Called by the receiver UI when they choose to share their PIN.
-   * Writes the PIN directly to the sender's socket as a pin-response,
-   * which auto-fills and submits it on the sender's side.
+   * The receiver already knows the PIN is correct (it's their own PIN), so
+   * we skip the wire protocol entirely: remove the onPinData listener, clear
+   * the pending check, and proceed directly to the normal incoming-request flow.
    *
    * @param {string} transferId
    */
   revealPinToReceiver(transferId) {
     const entry = this.pendingPinCheck.get(transferId);
     if (!entry) return;
-    // Write the PIN response directly — the sender's onPinData listener
-    // will receive it, validate it (correct by definition), and proceed.
-    entry.socket.write(JSON.stringify({ type: 'pin-response', pin: this.currentPin }));
-    console.log(`[Transfer] PIN auto-shared with sender for transfer ${transferId}`);
+
+    // Remove the temporary pin-data listener so it doesn't interfere with
+    // subsequent socket data (transfer-accept, file bytes, etc.)
+    if (entry.onPinData) entry.socket.removeListener('data', entry.onPinData);
+
+    clearTimeout(entry.timer);
+    this.pendingPinCheck.delete(transferId);
+
+    console.log(`[Transfer] PIN accepted by receiver for transfer ${transferId}; proceeding`);
+    this._onTransferRequest(entry.socket, entry.header, entry.initialData);
   }
 
   /**
@@ -182,6 +189,7 @@ class TransferService extends EventEmitter {
   declinePinRequest(transferId) {
     const entry = this.pendingPinCheck.get(transferId);
     if (!entry) return;
+    if (entry.onPinData) entry.socket.removeListener('data', entry.onPinData);
     clearTimeout(entry.timer);
     this.pendingPinCheck.delete(transferId);
     // Write a decline response so the sender gets a clean error, not a timeout
@@ -346,8 +354,15 @@ class TransferService extends EventEmitter {
         // Clean up PIN check state if present
         if (this.pendingPinCheck.has(transferId)) {
           const pinEntry = this.pendingPinCheck.get(transferId);
+          if (pinEntry.onPinData) socket.removeListener('data', pinEntry.onPinData);
           clearTimeout(pinEntry.timer);
           this.pendingPinCheck.delete(transferId);
+        }
+
+        // Clean up if still waiting for user accept/decline
+        if (this.pendingIncoming.has(transferId)) {
+          this.pendingIncoming.delete(transferId);
+          this.emit('transfer-error', { transferId, error: 'cancelled' });
         }
 
         if (this.activeReceiving.has(transferId)) {
@@ -364,8 +379,15 @@ class TransferService extends EventEmitter {
         // Clean up a pending PIN check if the sender disconnected early
         if (this.pendingPinCheck.has(transferId)) {
           const pinEntry = this.pendingPinCheck.get(transferId);
+          if (pinEntry.onPinData) socket.removeListener('data', pinEntry.onPinData);
           clearTimeout(pinEntry.timer);
           this.pendingPinCheck.delete(transferId);
+        }
+
+        // Clean up if still waiting for user accept/decline (sender cancelled mid-prompt)
+        if (this.pendingIncoming.has(transferId)) {
+          this.pendingIncoming.delete(transferId);
+          this.emit('transfer-error', { transferId, error: 'cancelled' });
         }
 
         if (this.activeReceiving.has(transferId)) {
@@ -454,7 +476,7 @@ class TransferService extends EventEmitter {
       socket.removeListener('data', onPinData);
 
       const pinEntry = this.pendingPinCheck.get(transferId);
-      if (!pinEntry) return; // already cleaned up (e.g. timeout fired)
+      if (!pinEntry) return; // already cleaned up (e.g. timeout fired or receiver approved)
 
       if (parsed.type !== 'pin-response') {
         // Unexpected message type — treat as wrong PIN.
@@ -490,6 +512,9 @@ class TransferService extends EventEmitter {
       this._onTransferRequest(socket, header, initialData);
     };
 
+    // Store the listener reference so revealPinToReceiver / declinePinRequest
+    // can remove it before calling _onTransferRequest.
+    this.pendingPinCheck.get(transferId).onPinData = onPinData;
     socket.on('data', onPinData);
   }
 

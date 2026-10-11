@@ -60,6 +60,10 @@ export default function App() {
     });
 
     api.onTransferProgress((progress) => {
+      // If this transfer was waiting on a PIN, the accept came through — clear the panel
+      setPinChallenge((prev) =>
+        prev?.transferId === progress.transferId ? null : prev
+      );
       setTransfers((prev) => ({
         ...prev,
         [progress.transferId]: { ...prev[progress.transferId], ...progress, status: 'progress' },
@@ -67,6 +71,9 @@ export default function App() {
     });
 
     api.onTransferComplete((info) => {
+      setPinChallenge((prev) =>
+        prev?.transferId === info.transferId ? null : prev
+      );
       setTransfers((prev) => ({
         ...prev,
         [info.transferId]: { ...prev[info.transferId], ...info, status: 'complete' },
@@ -97,6 +104,16 @@ export default function App() {
       if (['wrong-pin', 'pin-timeout', 'declined', 'cancelled'].includes(info.error)) {
         setPinChallenge(null);
       }
+
+      // If the Accept/Decline prompt is for this transfer, dismiss it
+      setIncomingRequest((prev) =>
+        prev?.transferId === info.transferId ? null : prev
+      );
+
+      // If the PIN share prompt is for this transfer, dismiss it
+      setPinShareRequest((prev) =>
+        prev?.transferId === info.transferId ? null : prev
+      );
 
       addNotification(
         info.error === 'declined'   ? `❌ Transfer declined`
