@@ -4,7 +4,10 @@ const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { execFile } = require('child_process');
 
-const isDev = process.env.NODE_ENV !== 'production';
+// app.isPackaged is false in dev (electron .), true in the installed/built app.
+// Never rely on NODE_ENV in the Electron main process — electron-builder does
+// not guarantee it is set to 'production' for the main process bundle.
+const isDev = !app.isPackaged;
 const TRANSFER_PORT = 54321;
 const BROADCAST_PORT = 54320;
 
@@ -120,7 +123,7 @@ function createMainWindow() {
 
   const startUrl = isDev
     ? 'http://localhost:3000'
-    : `file://${path.join(__dirname, 'build/index.html')}`;
+    : `file://${path.join(app.getAppPath(), 'build/index.html')}`;
 
   mainWindow.loadURL(startUrl);
   mainWindow.setIgnoreMouseEvents(false);
