@@ -151,11 +151,7 @@
   flex-shrink: 0;
 }
 
-/* Peer badge */
-.notch-right {
-  flex-shrink: 0;
-}
-
+/* Peer badge — now a button */
 .peer-badge {
   display: flex;
   flex-direction: column;
@@ -165,11 +161,22 @@
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.09);
   background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  font-family: var(--font);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.peer-badge:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .peer-badge.has-peers {
   border-color: rgba(93, 224, 200, 0.3);
   background: rgba(93, 224, 200, 0.08);
+}
+
+.peer-badge.has-peers:hover {
+  background: rgba(93, 224, 200, 0.14);
 }
 
 .peer-count {
@@ -236,6 +243,17 @@
 .peer-send-btn:hover {
   background: rgba(124, 111, 247, 0.1);
   border-color: rgba(124, 111, 247, 0.3);
+}
+
+/* Ping-only mode: no file dropped, send button is just a label */
+.peer-send-btn.ping-only {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.peer-send-btn.ping-only:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.07);
 }
 
 .peer-avatar {

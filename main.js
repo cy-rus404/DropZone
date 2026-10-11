@@ -55,8 +55,9 @@ function loadOrCreateDeviceId() {
 
   if (!deviceId) {
     deviceId = uuidv4();
-    deviceName = `DropZone-${require('os').hostname()}`;
-    fs.writeFileSync(configPath, JSON.stringify({ id: deviceId, name: deviceName }));
+    // No name yet — leave deviceName null so the renderer shows the setup screen
+    deviceName = null;
+    fs.writeFileSync(configPath, JSON.stringify({ id: deviceId, name: null }));
   }
 }
 
@@ -157,7 +158,22 @@ function createTray() {
 
 // Renderer asks for this device's info
 ipcMain.handle('get-device-info', () => {
-  return { id: deviceId, name: deviceName };
+  return { id: deviceId, name: deviceName, needsNameSetup: !deviceName };
+});
+
+// Renderer saves the user's chosen display name
+ipcMain.handle('save-device-name', (event, { name }) => {
+  deviceName = name;
+  fs.writeFileSync(configPath, JSON.stringify({ id: deviceId, name: deviceName }));
+  // Update the running services with the new name
+  if (discoveryService) {
+    discoveryService.deviceName = name;
+    // Re-advertise with the new name
+    discoveryService.stop();
+    discoveryService.start();
+  }
+  if (transferService) transferService.deviceName = name;
+  return { success: true };
 });
 
 // Renderer asks for peers list
@@ -212,13 +228,27 @@ ipcMain.handle('send-ping', async (event, { peerId }) => {
   if (discoveryService) discoveryService.sendPing(peerId);
 });
 
-// Play the ping sound on the receiver side
+// Play the ping sound on the receiver side for ~3 seconds
 ipcMain.on('play-ping-sound', () => {
-  // Use the shell to play a system sound cross-platform
   if (process.platform === 'darwin') {
-    require('child_process').exec('afplay /System/Library/Sounds/Ping.aiff');
+    // afplay each sound and chain them to fill ~3 seconds
+    const { exec } = require('child_process');
+    const sound = '/System/Library/Sounds/Ping.aiff';
+    // Run afplay 3 times sequentially (~1s each)
+    exec(`afplay "${sound}" && afplay "${sound}" && afplay "${sound}"`);
   } else if (process.platform === 'win32') {
-    require('child_process').exec('powershell -c "[console]::beep(880,300)"');
+    // PowerShell: beep 3 times at 880Hz, 300ms each with 100ms gaps = ~1.2s
+    // Repeat the sequence twice for ~3s total
+    const { exec } = require('child_process');
+    exec(
+      'powershell -c "' +
+      '[console]::beep(880,300); Start-Sleep -Milliseconds 100;' +
+      '[console]::beep(880,300); Start-Sleep -Milliseconds 100;' +
+      '[console]::beep(880,300); Start-Sleep -Milliseconds 100;' +
+      '[console]::beep(1046,300); Start-Sleep -Milliseconds 100;' +
+      '[console]::beep(1046,300); Start-Sleep -Milliseconds 100;' +
+      '[console]::beep(1046,500)"'
+    );
   }
 });
 

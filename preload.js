@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('dropzone', {
   // ── Queries ──────────────────────────────────────────────────────────────
   getDeviceInfo: () => ipcRenderer.invoke('get-device-info'),
   getPeers: () => ipcRenderer.invoke('get-peers'),
+  saveDeviceName: (name) => ipcRenderer.invoke('save-device-name', { name }),
 
   // ── Actions ──────────────────────────────────────────────────────────────
   sendFile: (filePath, peerId, transferId) => ipcRenderer.invoke('send-file', { filePath, peerId, transferId }),

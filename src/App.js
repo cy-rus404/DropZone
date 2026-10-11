@@ -1,28 +1,34 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { v4 as uuidv4 } from 'uuid';
-import { motion } from 'framer-motion';
 import DropNotch from './components/DropNotch';
 import IncomingPrompt from './components/IncomingPrompt';
+import NameSetup from './components/NameSetup';
 import './styles/global.css';
 
 const api = window.dropzone;
 
 export default function App() {
-  const [deviceInfo, setDeviceInfo]     = useState(null);
-  const [peers, setPeers]               = useState([]);
-  const [droppedFile, setDroppedFile]   = useState(null);
-  const [showPicker, setShowPicker]     = useState(false);
+  const [deviceInfo, setDeviceInfo]         = useState(null);
+  const [needsNameSetup, setNeedsNameSetup] = useState(false);
+  const [peers, setPeers]                   = useState([]);
+  const [droppedFile, setDroppedFile]       = useState(null);
+  const [showPicker, setShowPicker]         = useState(false);
   const [incomingRequest, setIncomingRequest] = useState(null);
-  const [transfers, setTransfers]       = useState({}); // transferId → status obj
-  const [notifications, setNotifications] = useState([]);
-  const [pingAlert, setPingAlert]       = useState(null); // incoming ping sender name
+  const [transfers, setTransfers]           = useState({});
+  const [notifications, setNotifications]   = useState([]);
+  const [pingAlert, setPingAlert]           = useState(null);
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       const info = await api.getDeviceInfo();
       setDeviceInfo(info);
+      if (info.needsNameSetup) {
+        setNeedsNameSetup(true);
+        api.resizeWindow(420, 320);
+        return; // don't load peers until name is set
+      }
       const initialPeers = await api.getPeers();
       setPeers(initialPeers);
     })();
@@ -37,11 +43,7 @@ export default function App() {
     api.onTransferProgress((progress) => {
       setTransfers((prev) => ({
         ...prev,
-        [progress.transferId]: {
-          ...prev[progress.transferId],
-          ...progress,
-          status: 'progress',
-        },
+        [progress.transferId]: { ...prev[progress.transferId], ...progress, status: 'progress' },
       }));
     });
 
@@ -66,21 +68,19 @@ export default function App() {
         ...prev,
         [info.transferId]: { ...prev[info.transferId], ...info, status: 'error' },
       }));
-      const msg = info.error === 'declined'
-        ? `❌ Transfer declined`
-        : `❌ Transfer failed: ${info.error}`;
-      addNotification(msg);
+      addNotification(
+        info.error === 'declined' ? `❌ Transfer declined` : `❌ Transfer failed: ${info.error}`
+      );
       setTimeout(() => {
         setTransfers((prev) => { const n = { ...prev }; delete n[info.transferId]; return n; });
         api.resizeWindow(420, 110);
       }, 3000);
     });
 
-    // Incoming ping
     api.onPingReceived((info) => {
       setPingAlert(info.senderName);
       api.playPingSound();
-      setTimeout(() => setPingAlert(null), 3500);
+      setTimeout(() => setPingAlert(null), 4000);
     });
 
     return () => {
@@ -92,18 +92,17 @@ export default function App() {
 
   // ── Window sizing ──────────────────────────────────────────────────────────
   useEffect(() => {
+    if (needsNameSetup) return;
     const activeTransfers = Object.values(transfers);
-    const hasActive = activeTransfers.length > 0;
-
     if (showPicker) {
       const h = 64 + 16 + Math.min(peers.length, 4) * 56 + 52 + (peers.length === 0 ? 80 : 0);
       api.resizeWindow(420, Math.max(h, 180));
-    } else if (hasActive) {
+    } else if (activeTransfers.length > 0) {
       api.resizeWindow(420, 64 + activeTransfers.length * 62 + 16);
     } else if (!incomingRequest) {
       api.resizeWindow(420, 110);
     }
-  }, [showPicker, transfers, peers.length, incomingRequest]);
+  }, [showPicker, transfers, peers.length, incomingRequest, needsNameSetup]);
 
   // ── Notifications ──────────────────────────────────────────────────────────
   const addNotification = useCallback((message) => {
@@ -112,21 +111,31 @@ export default function App() {
     setTimeout(() => setNotifications((prev) => prev.filter((n) => n.id !== id)), 3500);
   }, []);
 
+  // ── Name setup save ────────────────────────────────────────────────────────
+  const handleNameSave = useCallback(async (name) => {
+    await api.saveDeviceName(name);
+    setDeviceInfo((prev) => ({ ...prev, name }));
+    setNeedsNameSetup(false);
+    const initialPeers = await api.getPeers();
+    setPeers(initialPeers);
+    api.resizeWindow(420, 110);
+  }, []);
+
   // ── File drop ──────────────────────────────────────────────────────────────
   const handleFileDrop = useCallback((file) => {
     setDroppedFile(file);
-    if (peers.length === 0) {
-      addNotification('⚠️ No devices found on your network');
-      return;
-    }
     setShowPicker(true);
-  }, [peers, addNotification]);
+  }, []);
+
+  // ── Open peer list without file (for ping) ─────────────────────────────────
+  const handleOpenPeers = useCallback(() => {
+    setShowPicker(true);
+  }, []);
 
   // ── Send to peer ───────────────────────────────────────────────────────────
   const handleSendTo = useCallback(async (peerId) => {
     if (!droppedFile) return;
     setShowPicker(false);
-
     const transferId = uuidv4();
     setTransfers((prev) => ({
       ...prev,
@@ -138,7 +147,6 @@ export default function App() {
         percent: 0,
       },
     }));
-
     const result = await api.sendFile(droppedFile.path, peerId, transferId);
     if (!result.success) {
       addNotification(`❌ ${result.error}`);
@@ -189,19 +197,26 @@ export default function App() {
 
   return (
     <div className="app-root">
-      <DropNotch
-        deviceName={deviceInfo?.name}
-        peers={peers}
-        droppedFile={droppedFile}
-        onFileDrop={handleFileDrop}
-        onSendTo={handleSendTo}
-        onCancelPicker={handlePickerClose}
-        onPing={handlePing}
-        transfers={activeTransfers}
-        showPicker={showPicker}
-      />
+      {/* First-launch name setup — shown instead of the notch */}
+      <AnimatePresence>
+        {needsNameSetup && <NameSetup onSave={handleNameSave} />}
+      </AnimatePresence>
 
-      {/* Incoming transfer prompt — separate card, appears below notch */}
+      {!needsNameSetup && (
+        <DropNotch
+          deviceName={deviceInfo?.name}
+          peers={peers}
+          droppedFile={droppedFile}
+          onFileDrop={handleFileDrop}
+          onOpenPeers={handleOpenPeers}
+          onSendTo={handleSendTo}
+          onCancelPicker={handlePickerClose}
+          onPing={handlePing}
+          transfers={activeTransfers}
+          showPicker={showPicker}
+        />
+      )}
+
       <AnimatePresence>
         {incomingRequest && (
           <IncomingPrompt
@@ -212,12 +227,10 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Ping alert */}
       <AnimatePresence>
         {pingAlert && <PingAlert name={pingAlert} />}
       </AnimatePresence>
 
-      {/* Toast notifications */}
       <div className="notifications">
         <AnimatePresence>
           {notifications.map((n) => (
@@ -251,8 +264,7 @@ function PingAlert({ name }) {
       <motion.span
         animate={{ rotate: [0, -25, 25, -15, 15, -8, 8, 0] }}
         transition={{ duration: 0.7, repeat: 2 }}
-        style={{ display: 'inline-block' }}
-      >🔔</motion.span>
+        style={{ display: 'inline-block' }}>🔔</motion.span>
       <span><strong>{name}</strong> is pinging you!</span>
     </motion.div>
   );

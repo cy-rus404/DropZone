@@ -39,10 +39,11 @@ export default function DropNotch({
   peers,
   droppedFile,
   onFileDrop,
+  onOpenPeers,      // called when user clicks peer badge without a file
   onSendTo,
   onCancelPicker,
   onPing,
-  transfers,        // array of active transfer objects
+  transfers,
   showPicker,
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
@@ -169,17 +170,21 @@ export default function DropNotch({
           </AnimatePresence>
         </div>
 
-        {/* Right: peer count */}
+        {/* Right: peer count — clickable to open peer list */}
         <div className="notch-right">
-          <motion.div
+          <motion.button
             className={`peer-badge ${peers.length > 0 ? 'has-peers' : ''}`}
             key={peers.length}
             animate={{ scale: peers.length > 0 ? [1, 1.18, 1] : 1 }}
             transition={{ duration: 0.3 }}
+            onClick={() => !showPicker && onOpenPeers()}
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.94 }}
+            title="View devices"
           >
             <span className="peer-count">{peers.length}</span>
             <span className="peer-label">{peers.length === 1 ? 'device' : 'devices'}</span>
-          </motion.div>
+          </motion.button>
         </div>
       </div>
 
@@ -204,11 +209,16 @@ export default function DropNotch({
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.04, type: 'spring', stiffness: 400, damping: 28 }}>
-                    <button className="peer-send-btn" onClick={() => onSendTo(peer.id)}>
+                    <button
+                      className={`peer-send-btn ${!droppedFile ? 'ping-only' : ''}`}
+                      onClick={() => droppedFile && onSendTo(peer.id)}
+                      disabled={!droppedFile}
+                      title={droppedFile ? `Send to ${peer.name}` : peer.name}
+                    >
                       <span className="peer-avatar">{PLATFORM_ICONS[peer.platform] || '💻'}</span>
                       <span className="peer-name">{peer.name}</span>
                       <span className="peer-ip">{peer.host}</span>
-                      <span className="send-chevron">→</span>
+                      {droppedFile && <span className="send-chevron">→</span>}
                     </button>
                     <motion.button
                       className={`ping-btn ${pingTarget === peer.id ? 'pinging' : ''}`}
