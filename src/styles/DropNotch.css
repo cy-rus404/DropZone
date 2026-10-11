@@ -570,3 +570,29 @@
   justify-content: center;
   margin-top: 4px;
 }
+
+
+/* ── PIN waiting dots (sender waits for receiver to share) ── */
+.pin-waiting-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.pin-waiting-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.3;
+  animation: pin-dot-pulse 1.2s ease-in-out infinite;
+}
+
+.pin-waiting-dots span:nth-child(2) { animation-delay: 0.2s; }
+.pin-waiting-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes pin-dot-pulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(1); }
+  40%           { opacity: 1;   transform: scale(1.3); }
+}

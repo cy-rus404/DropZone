@@ -428,13 +428,6 @@ app.whenReady().then(async () => {
     }
   });
 
-  // Receiver explicitly asked to see their PIN so they can share it
-  transferService.on('show-pin-to-receiver', (info) => {
-    if (mainWindow) {
-      mainWindow.webContents.send('show-pin-to-receiver', info);
-    }
-  });
-
   discoveryService.on('peers-updated', (peers) => {
     if (mainWindow) mainWindow.webContents.send('peers-updated', peers);
   });

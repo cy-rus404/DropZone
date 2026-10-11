@@ -26,14 +26,11 @@ export default function App() {
   const [pinEnabled, setPinEnabled]   = useState(false);
   const [currentPin, setCurrentPin]   = useState(null);
 
-  // PIN entry dialog (sender side)
-  const [pinChallenge, setPinChallenge] = useState(null); // { transferId, receiverName? }
-  const [pinChallengeStep, setPinChallengeStep] = useState('prompt'); // 'prompt' | 'enter'
-  const [pinInput, setPinInput]         = useState('');
-  const [pinError, setPinError]         = useState(false);
+  // PIN waiting dialog (sender side — while waiting for receiver to Share PIN)
+  const [pinChallenge, setPinChallenge] = useState(null); // { transferId }
 
   // PIN share prompt (receiver side — shown when a sender connects and needs the PIN)
-  const [pinShareRequest, setPinShareRequest] = useState(null); // { transferId, senderName, revealedPin? }
+  const [pinShareRequest, setPinShareRequest] = useState(null); // { transferId, senderName }
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -99,9 +96,6 @@ export default function App() {
       // Clear PIN challenge for any error that terminates the transfer
       if (['wrong-pin', 'pin-timeout', 'declined', 'cancelled'].includes(info.error)) {
         setPinChallenge(null);
-        setPinChallengeStep('prompt');
-        setPinInput('');
-        if (info.error === 'wrong-pin') setPinError(true);
       }
 
       addNotification(
@@ -124,32 +118,22 @@ export default function App() {
       setTimeout(() => setPingAlert(null), 4000);
     });
 
-    // Receiver requires a PIN — show share/decline prompt to the sender first
+    // Receiver requires a PIN — show waiting state on sender
     api.onPinRequired((info) => {
       setPinChallenge({ transferId: info.transferId });
-      setPinChallengeStep('prompt');
-      setPinInput('');
-      setPinError(false);
       api.resizeWindow(400, 52 + 1 + 148 + 12);
     });
 
-    // Receiver: a PIN-protected sender has connected — ask if they want to share their PIN
+    // Receiver: a PIN-protected sender has connected — show share/decline prompt
     api.onPinShareRequest((info) => {
       setPinShareRequest({ transferId: info.transferId, senderName: info.senderName });
       api.resizeWindow(400, 280);
     });
 
-    // Receiver: service confirmed the PIN reveal — show it in the prompt
-    api.onShowPinToReceiver((info) => {
-      setPinShareRequest((prev) =>
-        prev?.transferId === info.transferId ? { ...prev, revealedPin: info.pin } : prev
-      );
-    });
-
     return () => {
       ['peers-updated', 'incoming-transfer-request', 'transfer-progress',
        'transfer-complete', 'transfer-error', 'ping-received', 'pin-required',
-       'pin-share-request', 'show-pin-to-receiver']
+       'pin-share-request']
         .forEach((ch) => api.removeAllListeners(ch));
     };
   }, []);
@@ -301,33 +285,22 @@ export default function App() {
     addNotification('Transfer declined');
   }, [incomingRequest, addNotification]);
 
-  // ── PIN submission (sender side) ───────────────────────────────────────────
-  const handlePinSubmit = useCallback((e) => {
-    e.preventDefault();
-    if (pinInput.length !== 6) return;
-    api.submitPin(pinChallenge.transferId, pinInput);
-    setPinChallenge(null);
-    setPinChallengeStep('prompt');
-    setPinInput('');
-    setPinError(false);
-  }, [pinChallenge, pinInput]);
-
+  // ── PIN cancel (sender side) ───────────────────────────────────────────────
   const handlePinCancel = useCallback(() => {
     if (!pinChallenge) return;
-    const { transferId } = pinChallenge;
-    // Destroy the outgoing socket — this triggers transfer-error on the sender side
-    // which will clean up the transfer entry via the onTransferError handler.
-    api.cancelTransfer(transferId);
+    api.cancelTransfer(pinChallenge.transferId);
     setPinChallenge(null);
-    setPinChallengeStep('prompt');
-    setPinInput('');
-    setPinError(false);
   }, [pinChallenge]);
 
   // ── Receiver PIN share prompt ───────────────────────────────────────────────
   const handleRevealPin = useCallback(() => {
     if (!pinShareRequest) return;
+    // Send PIN directly over the socket to the sender — they get auto-filled
     api.revealPinToReceiver(pinShareRequest.transferId);
+    // Dismiss immediately; the sender will now show the accept/decline prompt
+    // on their side once the PIN validates
+    setPinShareRequest(null);
+    api.resizeWindow(400, 36);
   }, [pinShareRequest]);
 
   const handleDeclinePinRequest = useCallback(() => {
@@ -336,13 +309,6 @@ export default function App() {
     setPinShareRequest(null);
     api.resizeWindow(400, 36);
   }, [pinShareRequest]);
-
-  const handleDismissPinShareRequest = useCallback(() => {
-    // Receiver shared the PIN and the sender is now working through the flow —
-    // just dismiss the prompt without killing the connection.
-    setPinShareRequest(null);
-    api.resizeWindow(400, 36);
-  }, []);
 
   const activeTransfers = Object.values(transfers);
 
@@ -382,95 +348,34 @@ export default function App() {
             />
           }
           showPin={!!pinChallenge}
-          pinStep={pinChallengeStep}
+          pinStep="waiting"
           pinContent={
             pinChallenge ? (() => {
               const receiverName =
                 transfers[pinChallenge.transferId]?.peerName || 'the receiver';
-
-              if (pinChallengeStep === 'prompt') {
-                return (
-                  <div className="pin-panel">
-                    <div className="pin-panel-header">
-                      <span className="pin-panel-icon">🔐</span>
-                      <div>
-                        <div className="pin-panel-title">PIN Protected</div>
-                        <div className="pin-panel-subtitle">
-                          {receiverName} requires a PIN to accept files
-                        </div>
-                      </div>
-                    </div>
-                    <p className="pin-share-hint">
-                      Ask <strong>{receiverName}</strong> to share their PIN with you,
-                      then enter it below.
-                    </p>
-                    <div className="pin-panel-actions pin-share-actions">
-                      <button
-                        type="button"
-                        className="cancel-btn"
-                        onClick={handlePinCancel}
-                      >
-                        Decline
-                      </button>
-                      <button
-                        type="button"
-                        className="pin-panel-submit"
-                        onClick={() => setPinChallengeStep('enter')}
-                      >
-                        Enter PIN →
-                      </button>
-                    </div>
-                  </div>
-                );
-              }
-
-              // step === 'enter'
               return (
                 <div className="pin-panel">
                   <div className="pin-panel-header">
                     <span className="pin-panel-icon">🔐</span>
                     <div>
-                      <div className="pin-panel-title">Enter PIN</div>
+                      <div className="pin-panel-title">Waiting for PIN</div>
                       <div className="pin-panel-subtitle">
-                        Type the PIN shared by {receiverName}
+                        Asking {receiverName} to share their PIN…
                       </div>
                     </div>
                   </div>
-                  <form onSubmit={handlePinSubmit} className="pin-panel-form">
-                    <input
-                      className={`pin-panel-input ${pinError ? 'has-error' : ''}`}
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength={6}
-                      placeholder="_ _ _ _ _ _"
-                      value={pinInput}
-                      onChange={(e) => {
-                        setPinError(false);
-                        setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6));
-                      }}
-                      autoFocus
-                    />
-                    {pinError && (
-                      <span className="pin-panel-error">Wrong PIN — try again</span>
-                    )}
-                    <div className="pin-panel-actions">
-                      <button
-                        type="button"
-                        className="cancel-btn"
-                        onClick={() => setPinChallengeStep('prompt')}
-                      >
-                        ← Back
-                      </button>
-                      <button
-                        type="submit"
-                        className="pin-panel-submit"
-                        disabled={pinInput.length !== 6}
-                      >
-                        Submit
-                      </button>
-                    </div>
-                  </form>
+                  <div className="pin-waiting-dots">
+                    <span /><span /><span />
+                  </div>
+                  <div className="pin-panel-actions pin-share-actions">
+                    <button
+                      type="button"
+                      className="cancel-btn"
+                      onClick={handlePinCancel}
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               );
             })() : null
@@ -497,7 +402,6 @@ export default function App() {
             request={pinShareRequest}
             onReveal={handleRevealPin}
             onDecline={handleDeclinePinRequest}
-            onDismiss={handleDismissPinShareRequest}
           />
         )}
       </AnimatePresence>
@@ -547,17 +451,16 @@ function PingAlert({ name }) {
 
 /**
  * PinSharePrompt — shown on the RECEIVER's machine when a PIN-protected sender
- * connects.  Lets the receiver reveal their PIN (so they can relay it) or
- * decline the incoming connection entirely.
+ * connects. The receiver can share their PIN (sent directly over the socket,
+ * auto-filling the sender's PIN field) or decline.
  *
  * Props:
- *   request   { transferId, senderName, revealedPin? }
- *   onReveal  () → ask the service to emit show-pin-to-receiver
- *   onDecline () → kill the connection
- *   onDismiss () → hide after pin was shared and sender is entering it
+ *   request   { transferId, senderName }
+ *   onReveal  () → sends PIN over socket to sender, dismisses prompt
+ *   onDecline () → kills the connection
  */
-function PinSharePrompt({ request, onReveal, onDecline, onDismiss }) {
-  const { senderName, revealedPin } = request;
+function PinSharePrompt({ request, onReveal, onDecline }) {
+  const { senderName } = request;
 
   return (
     <motion.div
@@ -589,20 +492,9 @@ function PinSharePrompt({ request, onReveal, onDecline, onDismiss }) {
           <span className="sender-name">{senderName}</span>
           <span className="wants-to-send"> wants to send you a file</span>
         </div>
-
-        {!revealedPin ? (
-          <p className="pin-share-body-hint">
-            Share your PIN with them so they can connect.
-          </p>
-        ) : (
-          <div className="pin-reveal-block">
-            <div className="pin-reveal-label">Your PIN</div>
-            <div className="pin-reveal-digits">
-              {String(revealedPin).split('').join(' ')}
-            </div>
-            <p className="pin-reveal-hint">Tell this to {senderName}</p>
-          </div>
-        )}
+        <p className="pin-share-body-hint">
+          Share your PIN with them to let them connect.
+        </p>
       </div>
 
       <div className="incoming-actions">
@@ -614,26 +506,14 @@ function PinSharePrompt({ request, onReveal, onDecline, onDismiss }) {
         >
           Decline
         </motion.button>
-
-        {!revealedPin ? (
-          <motion.button
-            className="action-btn accept-btn"
-            onClick={onReveal}
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.96 }}
-          >
-            Share PIN
-          </motion.button>
-        ) : (
-          <motion.button
-            className="action-btn accept-btn"
-            onClick={onDismiss}
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.96 }}
-          >
-            Done
-          </motion.button>
-        )}
+        <motion.button
+          className="action-btn accept-btn"
+          onClick={onReveal}
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.96 }}
+        >
+          Share PIN
+        </motion.button>
       </div>
     </motion.div>
   );

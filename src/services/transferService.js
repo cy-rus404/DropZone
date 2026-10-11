@@ -157,21 +157,19 @@ class TransferService extends EventEmitter {
   }
 
   /**
-   * Called by the receiver UI when they choose to share their PIN with an
-   * incoming sender.  Looks up the pending PIN check and writes the PIN
-   * back to the sender as an out-of-band JSON message so they can see it.
-   * The sender still has to type it manually — this just surfaces the PIN
-   * on the receiver's screen so they can relay it.
+   * Called by the receiver UI when they choose to share their PIN.
+   * Writes the PIN directly to the sender's socket as a pin-response,
+   * which auto-fills and submits it on the sender's side.
    *
    * @param {string} transferId
    */
   revealPinToReceiver(transferId) {
-    // Nothing to send over the wire — this is purely a local event so the
-    // receiver UI can display the PIN.  The pin value lives in this.currentPin.
-    // We emit a local event; main.js forwards it to the renderer.
-    if (this.pendingPinCheck.has(transferId)) {
-      this.emit('show-pin-to-receiver', { transferId, pin: this.currentPin });
-    }
+    const entry = this.pendingPinCheck.get(transferId);
+    if (!entry) return;
+    // Write the PIN response directly — the sender's onPinData listener
+    // will receive it, validate it (correct by definition), and proceed.
+    entry.socket.write(JSON.stringify({ type: 'pin-response', pin: this.currentPin }));
+    console.log(`[Transfer] PIN auto-shared with sender for transfer ${transferId}`);
   }
 
   /**

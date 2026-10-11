@@ -44,7 +44,6 @@ contextBridge.exposeInMainWorld('dropzone', {
   onPingReceived:      (cb) => ipcRenderer.on('ping-received',             (_, d) => cb(d)),
   onPinRequired:       (cb) => ipcRenderer.on('pin-required',              (_, d) => cb(d)),
   onPinShareRequest:   (cb) => ipcRenderer.on('pin-share-request',         (_, d) => cb(d)),
-  onShowPinToReceiver: (cb) => ipcRenderer.on('show-pin-to-receiver',      (_, d) => cb(d)),
 
   // ── Cleanup ───────────────────────────────────────────────────────────────
   removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
