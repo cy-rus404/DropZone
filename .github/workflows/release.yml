@@ -5,8 +5,11 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
-  build-windows:
+  release:
     runs-on: windows-latest
 
     steps:
@@ -25,34 +28,11 @@ jobs:
       - name: Generate icon
         run: node scripts/gen-icon.js
 
-      - name: Build Windows installer
+      - name: Build React
+        run: npm run react-build
+
+      - name: Build Windows installer & publish to GitHub Releases
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run build:win
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-dist
-          path: dist/*.exe
-
-  release:
-    needs: build-windows
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-dist
-          path: dist/
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*.exe
-          generate_release_notes: true
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npx electron-builder --win --publish always
