@@ -45,6 +45,7 @@ export default function DropNotch({
   onPing,
   transfers,
   showPicker,
+  onHoverChange,
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -53,6 +54,16 @@ export default function DropNotch({
 
   const isActive = showPicker || transfers.length > 0 || isDragOver;
   const isExpanded = isHovered || isActive;
+
+  const handleMouseEnter = useCallback(() => {
+    setIsHovered(true);
+    onHoverChange && onHoverChange(true);
+  }, [onHoverChange]);
+
+  const handleMouseLeave = useCallback(() => {
+    setIsHovered(false);
+    onHoverChange && onHoverChange(false);
+  }, [onHoverChange]);
 
   // ── Drag handlers ──────────────────────────────────────────────────────────
   const handleDragEnter = useCallback((e) => {
@@ -114,8 +125,8 @@ export default function DropNotch({
       className={`notch ${isDragOver ? 'drag-over' : ''} ${isExpanded ? 'expanded' : ''}`}
       animate={{ width: expandedWidth, height: expandedHeight, borderRadius: isExpanded ? 18 : 14 }}
       transition={spring}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}

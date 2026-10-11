@@ -65,9 +65,9 @@ function createMainWindow() {
   const { width: screenWidth } = screen.getPrimaryDisplay().workAreaSize;
 
   mainWindow = new BrowserWindow({
-    width: 420,
+    width: 120,
     height: 36,
-    x: Math.floor(screenWidth / 2) - 210,
+    x: Math.floor(screenWidth / 2) - 60,
     y: 0,
     frame: false,
     transparent: true,
@@ -75,8 +75,9 @@ function createMainWindow() {
     resizable: false,
     skipTaskbar: false,
     hasShadow: false,
-    vibrancy: 'under-window',
-    visualEffectState: 'active',
+    // No vibrancy — it fills the whole window rectangle with frosted glass
+    // regardless of the pill shape, creating a visible card behind it.
+    // The pill's own CSS backdrop-filter handles the blur effect.
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -90,15 +91,9 @@ function createMainWindow() {
     : `file://${path.join(__dirname, 'build/index.html')}`;
 
   mainWindow.loadURL(startUrl);
-
-  // Allow window to be dragged by the notch
   mainWindow.setIgnoreMouseEvents(false);
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
-
-  // Remove menu bar
+  mainWindow.on('closed', () => { mainWindow = null; });
   mainWindow.setMenuBarVisibility(false);
 
   if (isDev) {
