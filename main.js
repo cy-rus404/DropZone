@@ -4,10 +4,16 @@ const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { execFile } = require('child_process');
 
-// app.isPackaged is false in dev (electron .), true in the installed/built app.
-// Never rely on NODE_ENV in the Electron main process — electron-builder does
-// not guarantee it is set to 'production' for the main process bundle.
-const isDev = !app.isPackaged;
+// Reliable production detection that works at module load time.
+// app.isPackaged can be false at require-time on some Electron versions.
+// __dirname inside a packaged asar always contains 'app.asar', so we use
+// that as a secondary check alongside app.isPackaged.
+function getIsDev() {
+  if (app.isPackaged) return false;
+  if (__dirname.includes('app.asar')) return false;
+  return true;
+}
+const isDev = getIsDev();
 const TRANSFER_PORT = 54321;
 const BROADCAST_PORT = 54320;
 
@@ -131,7 +137,7 @@ function createMainWindow() {
   mainWindow.on('closed', () => { mainWindow = null; });
   mainWindow.setMenuBarVisibility(false);
 
-  if (isDev) {
+  if (isDev && process.env.OPEN_DEVTOOLS !== '0') {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 }
