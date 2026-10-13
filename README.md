@@ -15,6 +15,8 @@
 
 > Both devices must be on the same WiFi or LAN network.
 
+> **macOS users:** The app is not code-signed. After dragging DropZone to Applications, right-click the app → **Open** → click **Open** in the dialog. You only need to do this once.
+
 ---
 
 ## What it does
