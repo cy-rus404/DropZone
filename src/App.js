@@ -225,6 +225,12 @@ export default function App() {
     setSaveFolder(null);
   }, []);
 
+  // ── Profile edit (from Settings panel) ────────────────────────────────────
+  const handleSaveProfile = useCallback(async (name, newAvatar) => {
+    await api.saveDeviceName(name, newAvatar);
+    setDeviceInfo((prev) => ({ ...prev, name, avatar: newAvatar }));
+  }, []);
+
   // ── File drop ──────────────────────────────────────────────────────────────
   const handleFileDrop = useCallback((file) => {
     setDroppedFile(file);
@@ -364,6 +370,7 @@ export default function App() {
               saveFolder={saveFolder}
               onPickSaveFolder={handlePickSaveFolder}
               onClearSaveFolder={handleClearSaveFolder}
+              onSaveProfile={handleSaveProfile}
               onClose={() => setShowSettings(false)}
             />
           }

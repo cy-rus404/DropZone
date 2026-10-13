@@ -1,12 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import '../styles/Settings.css';
+
+const AVATARS = [
+  '🐶','🐱','🦊','🐼','🐨','🦁',
+  '🐯','🐸','🐧','🦋','🦄','🐲',
+  '👾','🤖','👻','🎃','⚡','🔥',
+  '🌊','🌈','🍕','🎮','🚀','💎',
+];
 
 /**
  * Settings
  *
  * Slides in to replace the peer-list area inside the notch pill.
- * Controlled entirely via props — no local state.
  *
  * Props:
  *   deviceName        {string}   Current device display name
@@ -18,6 +24,7 @@ import '../styles/Settings.css';
  *   saveFolder        {string}   Absolute path or null/empty
  *   onPickSaveFolder  {fn}       Called when 'Browse…' is clicked
  *   onClearSaveFolder {fn}       Called when 'Clear' is clicked
+ *   onSaveProfile     {fn}       Called with (name, avatar) when profile is saved
  *   onClose           {fn}       Called when 'Done' / close is pressed
  */
 export default function Settings({
@@ -30,8 +37,28 @@ export default function Settings({
   saveFolder,
   onPickSaveFolder,
   onClearSaveFolder,
+  onSaveProfile,
   onClose,
 }) {
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [draftName, setDraftName]           = useState(deviceName || '');
+  const [draftAvatar, setDraftAvatar]       = useState(avatar || '🤖');
+  const [nameError, setNameError]           = useState('');
+
+  const handleOpenEdit = () => {
+    setDraftName(deviceName || '');
+    setDraftAvatar(avatar || '🤖');
+    setNameError('');
+    setEditingProfile(true);
+  };
+
+  const handleSaveProfile = () => {
+    const trimmed = draftName.trim();
+    if (!trimmed) { setNameError('Name cannot be empty'); return; }
+    if (trimmed.length > 32) { setNameError('Max 32 characters'); return; }
+    onSaveProfile(trimmed, draftAvatar);
+    setEditingProfile(false);
+  };
   // Format the PIN string into spaced digits: '482193' → '4 8 2 1 9 3'
   const formattedPin = pin
     ? String(pin).split('').join(' ')
@@ -52,12 +79,22 @@ export default function Settings({
     >
       {/* ── Device header ─────────────────────────────────── */}
       <div className="settings-header">
-        <div className="settings-avatar" aria-hidden="true">
+        <motion.button
+          className="settings-avatar settings-avatar-btn"
+          onClick={handleOpenEdit}
+          whileHover={{ scale: 1.12 }}
+          whileTap={{ scale: 0.92 }}
+          title="Edit profile"
+          aria-label="Edit avatar and name"
+        >
           {avatar || '💻'}
-        </div>
+          <span className="settings-avatar-edit-hint">✏️</span>
+        </motion.button>
         <div className="settings-header-info">
           <span className="settings-device-name">{deviceName || 'This Device'}</span>
-          <span className="settings-subtitle">Settings</span>
+          <button className="settings-edit-link" onClick={handleOpenEdit}>
+            Edit profile
+          </button>
         </div>
         <button
           className="settings-close-x"
@@ -69,9 +106,73 @@ export default function Settings({
         </button>
       </div>
 
-      <div className="settings-divider" />
+      {/* ── Edit Profile Panel ────────────────────────────── */}
+      <AnimatePresence>
+        {editingProfile && (
+          <motion.div
+            className="settings-edit-profile"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="settings-divider" />
+            <div className="settings-section">
+              <div className="settings-section-label">Edit Profile</div>
+
+              {/* Avatar grid */}
+              <div className="settings-avatar-grid">
+                {AVATARS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    className={`settings-avatar-option${draftAvatar === emoji ? ' selected' : ''}`}
+                    onClick={() => setDraftAvatar(emoji)}
+                    aria-label={`Select avatar ${emoji}`}
+                    aria-pressed={draftAvatar === emoji}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+
+              {/* Name input */}
+              <input
+                className={`settings-name-input${nameError ? ' has-error' : ''}`}
+                type="text"
+                value={draftName}
+                onChange={(e) => { setDraftName(e.target.value); setNameError(''); }}
+                placeholder="Device name"
+                maxLength={32}
+                spellCheck={false}
+              />
+              {nameError && <span className="settings-name-error">{nameError}</span>}
+
+              {/* Actions */}
+              <div className="settings-edit-actions">
+                <button
+                  className="settings-btn-clear"
+                  onClick={() => setEditingProfile(false)}
+                >
+                  Cancel
+                </button>
+                <motion.button
+                  className="settings-btn-secondary"
+                  onClick={handleSaveProfile}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.96 }}
+                >
+                  Save
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Section 1: Default Save Folder ────────────────── */}
+      <div className="settings-divider" />
       <section className="settings-section" aria-label="Default save folder">
         <div className="settings-section-label">Default Save Folder</div>
 
