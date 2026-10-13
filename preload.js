@@ -33,7 +33,6 @@ contextBridge.exposeInMainWorld('dropzone', {
 
   // ── Discovery ─────────────────────────────────────────────────────────────
   sendPing:      (peerId) => ipcRenderer.invoke('send-ping', { peerId }),
-  playPingSound: ()       => ipcRenderer.send('play-ping-sound'),
 
   // ── Event listeners ───────────────────────────────────────────────────────
   onPeersUpdated:      (cb) => ipcRenderer.on('peers-updated',             (_, d) => cb(d)),

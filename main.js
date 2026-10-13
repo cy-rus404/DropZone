@@ -351,35 +351,30 @@ ipcMain.handle('send-ping', async (event, { peerId }) => {
   if (discoveryService) discoveryService.sendPing(peerId);
 });
 
-// Play the ping sound on the receiver side for ~3 seconds
-ipcMain.on('play-ping-sound', () => {
-  if (process.platform === 'darwin') {
-    // afplay each sound and chain them to fill ~3 seconds
-    const { exec } = require('child_process');
-    const sound = '/System/Library/Sounds/Ping.aiff';
-    // Run afplay 3 times sequentially (~1s each)
-    exec(`afplay "${sound}" && afplay "${sound}" && afplay "${sound}"`);
-  } else if (process.platform === 'win32') {
-    // PowerShell: beep 3 times at 880Hz, 300ms each with 100ms gaps = ~1.2s
-    // Repeat the sequence twice for ~3s total
-    const { exec } = require('child_process');
-    exec(
-      'powershell -c "' +
-      '[console]::beep(880,300); Start-Sleep -Milliseconds 100;' +
-      '[console]::beep(880,300); Start-Sleep -Milliseconds 100;' +
-      '[console]::beep(880,300); Start-Sleep -Milliseconds 100;' +
-      '[console]::beep(1046,300); Start-Sleep -Milliseconds 100;' +
-      '[console]::beep(1046,300); Start-Sleep -Milliseconds 100;' +
-      '[console]::beep(1046,500)"'
-    );
-  }
-});
-
 // ─── App Lifecycle ────────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
   loadOrCreateDeviceId();
   ensureWindowsFirewallRules();
+
+  // Allow the renderer to fetch and play audio from the Pixabay CDN
+  const { session } = require('electron');
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; " +
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+          "style-src 'self' 'unsafe-inline'; " +
+          "media-src 'self' https://cdn.pixabay.com; " +
+          "connect-src 'self' https://cdn.pixabay.com; " +
+          "img-src 'self' data: blob:;"
+        ],
+      },
+    });
+  });
+
   createMainWindow();
   createTray();
 

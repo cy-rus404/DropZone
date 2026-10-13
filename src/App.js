@@ -131,7 +131,10 @@ export default function App() {
 
     api.onPingReceived((info) => {
       setPingAlert(info.senderName);
-      api.playPingSound();
+      // Play a real notification chime fetched from online
+      const ping = new Audio('https://cdn.pixabay.com/download/audio/2022/03/15/audio_8cb749b05c.mp3');
+      ping.volume = 1.0;
+      ping.play().catch(() => {}); // silently ignore if playback is blocked
       setTimeout(() => setPingAlert(null), 4000);
     });
 
