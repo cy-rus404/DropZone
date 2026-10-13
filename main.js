@@ -356,25 +356,6 @@ ipcMain.handle('send-ping', async (event, { peerId }) => {
 app.whenReady().then(async () => {
   loadOrCreateDeviceId();
   ensureWindowsFirewallRules();
-
-  // Allow the renderer to fetch and play audio from the Pixabay CDN
-  const { session } = require('electron');
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [
-          "default-src 'self'; " +
-          "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-          "style-src 'self' 'unsafe-inline'; " +
-          "media-src 'self' https://cdn.pixabay.com; " +
-          "connect-src 'self' https://cdn.pixabay.com; " +
-          "img-src 'self' data: blob:;"
-        ],
-      },
-    });
-  });
-
   createMainWindow();
   createTray();
 

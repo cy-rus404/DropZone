@@ -131,10 +131,10 @@ export default function App() {
 
     api.onPingReceived((info) => {
       setPingAlert(info.senderName);
-      // Play a real notification chime fetched from online
-      const ping = new Audio('https://cdn.pixabay.com/download/audio/2022/03/15/audio_8cb749b05c.mp3');
+      // Play the bundled notification chime (works in both dev and packaged build)
+      const ping = new Audio(process.env.PUBLIC_URL + '/ping.mp3');
       ping.volume = 1.0;
-      ping.play().catch(() => {}); // silently ignore if playback is blocked
+      ping.play().catch((err) => console.warn('[PingSound] Playback failed:', err));
       setTimeout(() => setPingAlert(null), 4000);
     });
 
