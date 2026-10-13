@@ -11,6 +11,7 @@
 |----------|------|
 | 🪟 **Windows** (installer) | [DropZone Setup 1.0.0.exe](https://github.com/cy-rus404/DropZone/releases/latest) |
 | 🪟 **Windows** (portable)  | [DropZone 1.0.0.exe](https://github.com/cy-rus404/DropZone/releases/latest) |
+| 🍎 **macOS** (DMG)         | [DropZone-1.0.0.dmg](https://github.com/cy-rus404/DropZone/releases/latest) |
 
 > Both devices must be on the same WiFi or LAN network.
 
@@ -58,6 +59,7 @@ When a sender tries to connect, you (the receiver) get a popup asking if you wan
 - Both devices on the same WiFi/LAN
 - Port **54321 TCP** open between devices (added automatically on Windows via firewall rules)
 - Windows 10 or later (for the installer build)
+- macOS 10.13 or later (for the DMG build)
 
 ---
 
