@@ -9,9 +9,9 @@
 
 | Platform | Link |
 |----------|------|
-| 🪟 **Windows** (installer) | [DropZone Setup 1.0.0.exe](https://github.com/cy-rus404/DropZone/releases/latest) |
-| 🪟 **Windows** (portable)  | [DropZone 1.0.0.exe](https://github.com/cy-rus404/DropZone/releases/latest) |
-| 🍎 **macOS** (DMG)         | [DropZone-1.0.0.dmg](https://github.com/cy-rus404/DropZone/releases/latest) |
+|  **Windows** (installer) | [DropZone Setup 1.0.0.exe](https://github.com/cy-rus404/DropZone/releases/latest) |
+|  **Windows** (portable)  | [DropZone 1.0.0.exe](https://github.com/cy-rus404/DropZone/releases/latest) |
+|  **macOS** (DMG)         | [DropZone-1.0.0.dmg](https://github.com/cy-rus404/DropZone/releases/latest) |
 
 > Both devices must be on the same WiFi or LAN network.
 
