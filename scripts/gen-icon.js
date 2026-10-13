@@ -243,3 +243,71 @@ fs.mkdirSync(outDir, { recursive: true });
 const ico = buildIco([256, 48, 32, 16]);
 fs.writeFileSync(outPath, ico);
 console.log(`✅  icon.ico written to ${outPath} (${ico.length} bytes)`);
+
+// ── Write icon.png (for macOS / Linux builds) ──────────────────────────────────
+function encodePng(pixels, size) {
+  function crc32(buf) {
+    const table = [];
+    for (let i = 0; i < 256; i++) {
+      let v = i;
+      for (let j = 0; j < 8; j++) v = (v & 1) ? (0xedb88320 ^ (v >>> 1)) : (v >>> 1);
+      table[i] = v;
+    }
+    let c = 0xffffffff;
+    for (let i = 0; i < buf.length; i++) c = table[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  }
+
+  function chunk(type, data) {
+    const typeBuf = Buffer.from(type);
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const crcBuf = Buffer.alloc(4);
+    crcBuf.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])));
+    return Buffer.concat([len, typeBuf, data, crcBuf]);
+  }
+
+  function adler32(buf) {
+    let s1 = 1, s2 = 0;
+    for (let i = 0; i < buf.length; i++) { s1 = (s1 + buf[i]) % 65521; s2 = (s2 + s1) % 65521; }
+    return (s2 << 16) | s1;
+  }
+
+  function deflateStore(data) {
+    const chunks = [];
+    const BLOCK = 65535;
+    for (let i = 0; i < data.length; i += BLOCK) {
+      const block = data.slice(i, i + BLOCK);
+      const last = (i + BLOCK >= data.length) ? 1 : 0;
+      const hdr = Buffer.alloc(5);
+      hdr[0] = last;
+      hdr.writeUInt16LE(block.length, 1);
+      hdr.writeUInt16LE(~block.length & 0xffff, 3);
+      chunks.push(hdr, block);
+    }
+    const adler = Buffer.alloc(4); adler.writeUInt32BE(adler32(data));
+    return Buffer.concat([Buffer.from([0x78, 0x01]), ...chunks, adler]);
+  }
+
+  const ihdrData = Buffer.alloc(13);
+  ihdrData.writeUInt32BE(size, 0); ihdrData.writeUInt32BE(size, 4);
+  ihdrData[8] = 8; ihdrData[9] = 6; // 8-bit RGBA
+
+  const raw = Buffer.alloc(size * (size * 4 + 1));
+  for (let y = 0; y < size; y++) {
+    raw[y * (size * 4 + 1)] = 0;
+    for (let x = 0; x < size; x++) {
+      const px = pixels[y * size + x];
+      const off = y * (size * 4 + 1) + 1 + x * 4;
+      raw[off] = px.r; raw[off+1] = px.g; raw[off+2] = px.b; raw[off+3] = px.a;
+    }
+  }
+
+  const sig = Buffer.from([137,80,78,71,13,10,26,10]);
+  return Buffer.concat([sig, chunk('IHDR', ihdrData), chunk('IDAT', deflateStore(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
+
+const pngPixels = renderIcon(1024);
+const png = encodePng(pngPixels, 1024);
+const pngPath = path.join(outDir, 'icon.png');
+fs.writeFileSync(pngPath, png);
+console.log(`✅  icon.png written to ${pngPath} (${png.length} bytes)`);
