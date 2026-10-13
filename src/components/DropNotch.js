@@ -1,20 +1,54 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Image,
+  Film,
+  Music,
+  FileText,
+  File,
+  Package,
+  Code,
+  Terminal,
+  Monitor,
+  Settings,
+  MonitorSpeaker,
+  Apple,
+  Layers,
+  Search,
+  Bell,
+  ChevronRight,
+  CheckCircle,
+  XCircle,
+  ArrowUp,
+  ArrowDown,
+} from 'lucide-react';
+import { AvatarIcon, DEFAULT_AVATAR } from '../avatarIcons';
 import '../styles/DropNotch.css';
 
-const FILE_ICONS = {
-  jpg: '🖼️', jpeg: '🖼️', png: '🖼️', gif: '🖼️', webp: '🖼️', svg: '🖼️',
-  mp4: '🎬', mov: '🎬', avi: '🎬', mkv: '🎬',
-  mp3: '🎵', wav: '🎵', flac: '🎵', aac: '🎵',
-  pdf: '📕', doc: '📝', docx: '📝', txt: '📄', md: '📄',
-  zip: '📦', rar: '📦', tar: '📦', gz: '📦',
-  js: '⚙️', ts: '⚙️', py: '🐍', json: '📋',
-  exe: '💻', dmg: '💻', app: '💻',
+// ── File-type → icon component mapping ──────────────────────────────────────
+const FILE_ICON_MAP = {
+  jpg: Image, jpeg: Image, png: Image, gif: Image, webp: Image, svg: Image,
+  mp4: Film, mov: Film, avi: Film, mkv: Film,
+  mp3: Music, wav: Music, flac: Music, aac: Music,
+  pdf: FileText, doc: FileText, docx: FileText, txt: File, md: File,
+  zip: Package, rar: Package, tar: Package, gz: Package,
+  js: Code, ts: Code, py: Terminal, json: FileText,
+  exe: Monitor, dmg: Monitor, app: Monitor,
 };
 
-function fileIcon(name) {
-  if (!name) return '📄';
-  return FILE_ICONS[name.split('.').pop().toLowerCase()] || '📄';
+function FileIcon({ name, size = 14 }) {
+  if (!name) return <File size={size} />;
+  const ext = name.split('.').pop().toLowerCase();
+  const Icon = FILE_ICON_MAP[ext] || File;
+  return <Icon size={size} />;
+}
+
+// Platform icon for peer devices
+function PlatformIcon({ platform, size = 16 }) {
+  if (platform === 'darwin') return <Apple size={size} />;
+  if (platform === 'linux')  return <Layers size={size} />;
+  // win32 or anything else
+  return <MonitorSpeaker size={size} />;
 }
 
 function formatBytes(b) {
@@ -102,12 +136,6 @@ export default function DropNotch({
   }, [onPing]);
 
   // ── Sizing ───────────────────────────────────────────────────────────────
-  // Collapsed: 120 × 28
-  // Hovered/expanded bar: 380 × 52
-  // Picker: 380 × dynamic
-  // Settings: 380 × 52 + 1 + 268
-  // Transfer: 380 × dynamic
-
   const pickerContentH = peers.length === 0
     ? 80
     : Math.min(peers.length, 4) * 54 + 8;
@@ -118,7 +146,7 @@ export default function DropNotch({
   const expandedWidth  = isExpanded ? 380 : 120;
   const expandedHeight = isExpanded
     ? showPin
-      ? 52 + 1 + 148             // bar + divider + pin panel
+      ? 52 + 1 + 148
       : showSettings
       ? 52 + 1 + 268
       : showPicker
@@ -129,6 +157,10 @@ export default function DropNotch({
     : 28;
 
   const spring = { type: 'spring', stiffness: 380, damping: 32 };
+
+  // Render the device avatar using the shared icon system
+  const AvatarDisplay = () =>
+    <AvatarIcon id={avatar || DEFAULT_AVATAR} size={16} className="notch-logo-icon" />;
 
   return (
     <motion.div
@@ -149,7 +181,7 @@ export default function DropNotch({
           <motion.div className="notch-dot"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.12 }}>
-            <span className="notch-dot-icon">{avatar || '🌀'}</span>
+            <span className="notch-dot-icon"><AvatarDisplay /></span>
             {peers.length > 0 && (
               <span className="notch-dot-badge">{peers.length}</span>
             )}
@@ -169,7 +201,7 @@ export default function DropNotch({
               <motion.span className="logo"
                 animate={{ rotate: isDragOver ? [0, -12, 12, -6, 6, 0] : 0 }}
                 transition={{ duration: 0.4 }}>
-                {avatar || '🌀'}
+                <AvatarDisplay />
               </motion.span>
               <div className="device-info">
                 <span className="app-name">DropZone</span>
@@ -184,7 +216,9 @@ export default function DropNotch({
                   <motion.div key="file" className="file-pill"
                     initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.85 }} transition={{ duration: 0.15 }}>
-                    <span className="file-pill-icon">{fileIcon(droppedFile.name)}</span>
+                    <span className="file-pill-icon">
+                      <FileIcon name={droppedFile.name} size={13} />
+                    </span>
                     <span className="file-pill-name">{droppedFile.name}</span>
                     <span className="file-pill-size">{formatBytes(droppedFile.size)}</span>
                   </motion.div>
@@ -240,8 +274,9 @@ export default function DropNotch({
               whileHover={{ scale: 1.1, rotate: 45 }}
               whileTap={{ scale: 0.9 }}
               title="Settings"
+              aria-label="Open settings"
             >
-              ⚙️
+              <Settings size={14} strokeWidth={2} />
             </motion.button>
           </motion.div>
         )}
@@ -280,7 +315,7 @@ export default function DropNotch({
             <div className="divider" />
             {peers.length === 0 ? (
               <div className="no-peers">
-                <span>🔍</span>
+                <Search size={24} className="no-peers-icon" />
                 <p>No devices found</p>
                 <p className="no-peers-hint">Open DropZone on another device</p>
               </div>
@@ -296,26 +331,33 @@ export default function DropNotch({
                       disabled={!droppedFile}
                     >
                       <span className="peer-avatar">
-                        {peer.avatar || (
-                          peer.platform === 'win32' ? '🪟' :
-                          peer.platform === 'darwin' ? '🍎' :
-                          peer.platform === 'linux' ? '🐧' : '💻'
-                        )}
+                        {peer.avatar
+                          ? <AvatarIcon id={peer.avatar} size={16} />
+                          : <PlatformIcon platform={peer.platform} size={16} />
+                        }
                       </span>
                       <span className="peer-name">{peer.name}</span>
                       <span className="peer-ip">{peer.host}</span>
-                      {droppedFile && <span className="send-chevron">→</span>}
+                      {droppedFile && (
+                        <span className="send-chevron">
+                          <ChevronRight size={12} strokeWidth={2.5} />
+                        </span>
+                      )}
                     </button>
                     <motion.button
                       className={`ping-btn ${pingTarget === peer.id ? 'pinging' : ''}`}
                       onClick={(e) => handlePing(e, peer.id)}
                       whileTap={{ scale: 0.82 }}
                       title="Ping"
+                      aria-label="Ping device"
                     >
                       <motion.span
                         animate={pingTarget === peer.id
                           ? { scale: [1, 1.5, 1], rotate: [0, -20, 20, 0] } : {}}
-                        transition={{ duration: 0.45 }}>🔔</motion.span>
+                        transition={{ duration: 0.45 }}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Bell size={13} strokeWidth={2} />
+                      </motion.span>
                     </motion.button>
                   </motion.div>
                 ))}
@@ -356,11 +398,17 @@ function TransferRow({ transfer }) {
       exit={{ opacity: 0, y: -5 }}>
       <div className="transfer-row-top">
         <span className={`xfr-badge ${direction === 'sending' ? 'send' : 'recv'}`}>
-          {direction === 'sending' ? '↑' : '↓'}
+          {direction === 'sending'
+            ? <ArrowUp size={9} strokeWidth={3} />
+            : <ArrowDown size={9} strokeWidth={3} />}
         </span>
         <span className="xfr-name" title={filename}>{filename}</span>
         <span className="xfr-pct">
-          {isComplete ? '✓' : isError ? '✗' : `${percent}%`}
+          {isComplete
+            ? <CheckCircle size={11} strokeWidth={2.5} className="xfr-done-icon" />
+            : isError
+            ? <XCircle size={11} strokeWidth={2.5} className="xfr-err-icon" />
+            : `${percent}%`}
         </span>
       </div>
       <div className="xfr-track">

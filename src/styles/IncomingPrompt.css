@@ -44,7 +44,14 @@
 }
 
 .incoming-icon {
-  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* SVG icon inside incoming-icon */
+.incoming-icon-svg {
+  color: var(--accent);
 }
 
 .incoming-title {
@@ -87,8 +94,11 @@
 }
 
 .file-card-icon {
-  font-size: 26px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
 }
 
 .file-card-info {

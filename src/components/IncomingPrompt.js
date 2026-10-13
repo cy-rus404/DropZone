@@ -1,5 +1,14 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import {
+  ArrowDownToLine,
+  Image,
+  Film,
+  Music,
+  FileText,
+  File,
+  Package,
+} from 'lucide-react';
 import '../styles/IncomingPrompt.css';
 
 function formatBytes(bytes) {
@@ -10,17 +19,19 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-function getFileIcon(filename) {
-  if (!filename) return '📄';
+const FILE_ICON_MAP = {
+  jpg: Image, jpeg: Image, png: Image, gif: Image, webp: Image, svg: Image,
+  mp4: Film, mov: Film, avi: Film, mkv: Film,
+  mp3: Music, wav: Music, flac: Music, aac: Music,
+  pdf: FileText, doc: FileText, docx: FileText, txt: File, md: File,
+  zip: Package, rar: Package, tar: Package, gz: Package,
+};
+
+function FileIcon({ filename, size = 26 }) {
+  if (!filename) return <File size={size} />;
   const ext = filename.split('.').pop().toLowerCase();
-  const icons = {
-    jpg: '🖼️', jpeg: '🖼️', png: '🖼️', gif: '🖼️', webp: '🖼️', svg: '🖼️',
-    mp4: '🎬', mov: '🎬', avi: '🎬', mkv: '🎬',
-    mp3: '🎵', wav: '🎵', flac: '🎵', aac: '🎵',
-    pdf: '📕', doc: '📝', docx: '📝', txt: '📄', md: '📄',
-    zip: '📦', rar: '📦', tar: '📦', gz: '📦',
-  };
-  return icons[ext] || '📄';
+  const Icon = FILE_ICON_MAP[ext] || File;
+  return <Icon size={size} />;
 }
 
 /**
@@ -51,7 +62,7 @@ export default function IncomingPrompt({ request, onAccept, onDecline }) {
           animate={{ y: [0, -4, 0] }}
           transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
         >
-          📥
+          <ArrowDownToLine size={20} className="incoming-icon-svg" />
         </motion.div>
         <div className="incoming-title">Incoming File</div>
       </div>
@@ -63,7 +74,9 @@ export default function IncomingPrompt({ request, onAccept, onDecline }) {
         </div>
 
         <div className="file-card">
-          <div className="file-card-icon">{getFileIcon(filename)}</div>
+          <div className="file-card-icon">
+            <FileIcon filename={filename} size={26} />
+          </div>
           <div className="file-card-info">
             <div className="file-card-name">{filename}</div>
             <div className="file-card-size">{formatBytes(fileSize)}</div>

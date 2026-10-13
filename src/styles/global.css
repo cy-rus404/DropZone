@@ -78,7 +78,18 @@ body,
   border-radius: 20px;
   box-shadow: var(--shadow-glass);
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
+
+/* Lucide icon inside toast */
+.toast-icon {
+  flex-shrink: 0;
+}
+.toast-icon-success { color: var(--success); }
+.toast-icon-error   { color: var(--error); }
+.toast-icon-bell    { color: var(--warning); }
 
 /* ── Ping alert ─────────────────────────────────────────── */
 .ping-alert {
@@ -97,6 +108,12 @@ body,
   box-shadow: 0 0 20px rgba(251, 191, 36, 0.2), var(--shadow-glass);
   white-space: nowrap;
   margin-top: 6px;
+}
+
+/* Bell icon in ping alert */
+.ping-alert-icon {
+  color: var(--warning);
+  flex-shrink: 0;
 }
 
 /* ── PIN entry dialog (sender side) ────────────────────── */

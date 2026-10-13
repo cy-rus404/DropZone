@@ -50,12 +50,20 @@
 /* ── Avatar preview ───────────────────────────────────────── */
 
 .avatar-preview {
-  font-size: 48px;
-  line-height: 1;
-  text-align: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(124, 111, 247, 0.12);
+  border: 2px solid rgba(124, 111, 247, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: 4px;
-  filter: drop-shadow(0 0 10px rgba(124, 111, 247, 0.5));
-  user-select: none;
+  filter: drop-shadow(0 0 12px rgba(124, 111, 247, 0.4));
+}
+
+.avatar-preview-icon {
+  color: var(--accent, #7c6ff7);
 }
 
 /* ── Avatar grid ──────────────────────────────────────────── */
@@ -74,25 +82,26 @@
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid transparent;
-  font-size: 20px;
-  line-height: 1;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+  color: var(--text-secondary, rgba(255,255,255,0.48));
+  transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease, color 0.12s ease;
   user-select: none;
 }
 
 .avatar-option.selected {
-  border-color: var(--accent);
+  border-color: var(--accent, #7c6ff7);
   background: rgba(124, 111, 247, 0.15);
   box-shadow: 0 0 0 1px rgba(124, 111, 247, 0.3);
+  color: var(--accent, #7c6ff7);
 }
 
 .avatar-option:not(.selected):hover {
   background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, rgba(255,255,255,0.92));
 }
 
 /* ── Name form ────────────────────────────────────────────── */

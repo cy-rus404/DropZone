@@ -1,24 +1,16 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { AVATAR_LIST, DEFAULT_AVATAR, AvatarIcon } from '../avatarIcons';
 import './NameSetup.css';
-
-const AVATARS = [
-  '🐶','🐱','🦊','🐼','🐨','🦁',
-  '🐯','🐸','🐧','🦋','🦄','🐲',
-  '👾','🤖','👻','🎃','⚡','🔥',
-  '🌊','🌈','🍕','🎮','🚀','💎',
-];
-
-const DEFAULT_AVATAR = '🤖';
 
 /**
  * NameSetup — First-launch modal asking the user to choose an avatar and set a
  * display name. Shown once; the name and avatar are saved to device.json via IPC.
  */
 export default function NameSetup({ onSave }) {
-  const [name, setName] = useState('');
+  const [name, setName]     = useState('');
   const [avatar, setAvatar] = useState(DEFAULT_AVATAR);
-  const [error, setError] = useState('');
+  const [error, setError]   = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -42,24 +34,26 @@ export default function NameSetup({ onSave }) {
       >
         <h1 className="name-setup-title">Welcome to DropZone</h1>
         <p className="name-setup-subtitle">
-          Pick an avatar and set a display name so others on your network know who you are.
+          Pick an icon and set a display name so others on your network know who you are.
         </p>
 
         {/* Avatar preview */}
-        <div className="avatar-preview">{avatar}</div>
+        <div className="avatar-preview">
+          <AvatarIcon id={avatar} size={44} className="avatar-preview-icon" />
+        </div>
 
         {/* Avatar grid */}
         <div className="avatar-grid">
-          {AVATARS.map((emoji) => (
+          {AVATAR_LIST.map((id) => (
             <button
-              key={emoji}
+              key={id}
               type="button"
-              className={`avatar-option${avatar === emoji ? ' selected' : ''}`}
-              onClick={() => setAvatar(emoji)}
-              aria-label={`Select avatar ${emoji}`}
-              aria-pressed={avatar === emoji}
+              className={`avatar-option${avatar === id ? ' selected' : ''}`}
+              onClick={() => setAvatar(id)}
+              aria-label={`Select avatar ${id}`}
+              aria-pressed={avatar === id}
             >
-              {emoji}
+              <AvatarIcon id={id} size={18} />
             </button>
           ))}
         </div>

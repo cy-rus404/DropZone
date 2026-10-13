@@ -68,7 +68,11 @@ function ensureWindowsFirewallRules() {
 }
 
 function loadOrCreateDeviceId() {
-  const { width: screenWidth } = screen.getPrimaryDisplay().workAreaSize;
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth } = primaryDisplay.workAreaSize;
+  // workArea.y is the top offset of the usable area (non-zero when a taskbar
+  // sits at the top of the screen, e.g. macOS menu bar or a Windows top taskbar).
+  const workAreaTop = primaryDisplay.workArea.y;
 
   try {
     if (fs.existsSync(configPath)) {
@@ -97,10 +101,10 @@ function loadOrCreateDeviceId() {
     fs.writeFileSync(configPath, JSON.stringify({ id: deviceId, name: null, currentPin }));
   }
 
-  // Default pill position: center-top
+  // Default pill position: center of work area, just below any top system bar
   if (pillX === null || pillY === null) {
     pillX = Math.floor(screenWidth / 2) - 200;
-    pillY = 0;
+    pillY = workAreaTop; // respects macOS menu bar, Windows top taskbar, etc.
   }
 }
 

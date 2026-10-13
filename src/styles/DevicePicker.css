@@ -33,7 +33,9 @@
 }
 
 .picker-icon {
-  font-size: 15px;
+  display: flex;
+  align-items: center;
+  color: var(--accent-secondary);
 }
 
 .picker-file-badge {
@@ -69,8 +71,11 @@
 }
 
 .no-peers-icon {
-  font-size: 28px;
+  color: var(--text-muted);
   margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .no-peers-message p {
@@ -103,7 +108,6 @@
 }
 
 .peer-avatar {
-  font-size: 22px;
   flex-shrink: 0;
   width: 36px;
   height: 36px;
@@ -113,6 +117,7 @@
   background: rgba(255, 255, 255, 0.05);
   border-radius: 50%;
   border: 1px solid var(--border-glass);
+  color: var(--text-secondary);
 }
 
 .peer-details {
@@ -139,7 +144,8 @@
 }
 
 .send-arrow {
-  font-size: 16px;
+  display: flex;
+  align-items: center;
   color: var(--accent);
   opacity: 0.7;
   flex-shrink: 0;

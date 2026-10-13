@@ -12,13 +12,19 @@
     "electron": "electron .",
     "dev": "concurrently \"cross-env BROWSER=none react-scripts start\" \"wait-on http://localhost:3000 && electron .\""
   },
-  "keywords": ["file-transfer", "airdrop", "electron", "local-network"],
+  "keywords": [
+    "file-transfer",
+    "airdrop",
+    "electron",
+    "local-network"
+  ],
   "author": "DropZone",
   "license": "MIT",
   "homepage": "./",
   "dependencies": {
     "bonjour-service": "^1.1.1",
     "framer-motion": "^10.16.4",
+    "lucide-react": "^0.460.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
@@ -51,11 +57,15 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.ico",
@@ -94,7 +104,15 @@
     }
   },
   "browserslist": {
-    "production": [">0.2%", "not dead", "not op_mini all"],
-    "development": ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
   }
 }

@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  CheckCircle,
+  XCircle,
+  Bell,
+  Lock,
+} from 'lucide-react';
 import DropNotch from './components/DropNotch';
 import IncomingPrompt from './components/IncomingPrompt';
 import NameSetup from './components/NameSetup';
@@ -80,8 +86,8 @@ export default function App() {
       }));
       addNotification(
         info.direction === 'receiving'
-          ? `✅ Received "${info.filename}"`
-          : `✅ Sent "${info.filename}" successfully`
+          ? { icon: 'success', text: `Received "${info.filename}"` }
+          : { icon: 'success', text: `Sent "${info.filename}" successfully` }
       );
       setTimeout(() => {
         setTransfers((prev) => { const n = { ...prev }; delete n[info.transferId]; return n; });
@@ -116,10 +122,10 @@ export default function App() {
       );
 
       addNotification(
-        info.error === 'declined'   ? `❌ Transfer declined`
-        : info.error === 'cancelled'  ? `❌ Transfer cancelled`
-        : info.error === 'wrong-pin' ? `❌ Wrong PIN — transfer rejected`
-        : `❌ Transfer failed: ${info.error}`
+        info.error === 'declined'   ? { icon: 'error', text: 'Transfer declined' }
+        : info.error === 'cancelled'  ? { icon: 'error', text: 'Transfer cancelled' }
+        : info.error === 'wrong-pin' ? { icon: 'error', text: 'Wrong PIN — transfer rejected' }
+        : { icon: 'error', text: `Transfer failed: ${info.error}` }
       );
 
       const delay = isSilent ? 0 : 3000;
@@ -274,7 +280,7 @@ export default function App() {
   // ── Ping ───────────────────────────────────────────────────────────────────
   const handlePing = useCallback((peerId) => {
     api.sendPing(peerId);
-    addNotification('🔔 Ping sent!');
+    addNotification({ icon: 'bell', text: 'Ping sent!' });
   }, [addNotification]);
 
   // ── Accept incoming ────────────────────────────────────────────────────────
@@ -308,7 +314,7 @@ export default function App() {
     if (!incomingRequest) return;
     api.respondToTransfer(incomingRequest.transferId, false, null);
     setIncomingRequest(null);
-    addNotification('Transfer declined');
+    addNotification({ icon: 'error', text: 'Transfer declined' });
   }, [incomingRequest, addNotification]);
 
   // ── PIN cancel (sender side) ───────────────────────────────────────────────
@@ -383,7 +389,7 @@ export default function App() {
               return (
                 <div className="pin-panel">
                   <div className="pin-panel-header">
-                    <span className="pin-panel-icon">🔐</span>
+                    <span className="pin-panel-icon"><Lock size={20} strokeWidth={2} /></span>
                     <div>
                       <div className="pin-panel-title">Waiting for PIN</div>
                       <div className="pin-panel-subtitle">
@@ -449,13 +455,20 @@ export default function App() {
 }
 
 function Notification({ message }) {
+  // message can be a string (legacy) or { icon: 'success'|'error'|'bell', text: string }
+  const text = typeof message === 'string' ? message : message.text;
+  const icon = typeof message === 'string' ? null : message.icon;
+
   return (
     <motion.div className="toast"
       initial={{ opacity: 0, y: -10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -10, scale: 0.95 }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}>
-      {message}
+      {icon === 'success' && <CheckCircle size={13} className="toast-icon toast-icon-success" />}
+      {icon === 'error'   && <XCircle size={13} className="toast-icon toast-icon-error" />}
+      {icon === 'bell'    && <Bell size={13} className="toast-icon toast-icon-bell" />}
+      <span>{text}</span>
     </motion.div>
   );
 }
@@ -470,7 +483,9 @@ function PingAlert({ name }) {
       <motion.span
         animate={{ rotate: [0, -25, 25, -15, 15, -8, 8, 0] }}
         transition={{ duration: 0.7, repeat: 2 }}
-        style={{ display: 'inline-block' }}>🔔</motion.span>
+        style={{ display: 'flex', alignItems: 'center' }}>
+        <Bell size={15} className="ping-alert-icon" />
+      </motion.span>
       <span><strong>{name}</strong> is pinging you!</span>
     </motion.div>
   );
@@ -509,7 +524,7 @@ function PinSharePrompt({ request, onReveal, onDecline }) {
           animate={{ y: [0, -4, 0] }}
           transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
         >
-          🔐
+          <Lock size={28} strokeWidth={1.5} className="incoming-icon-svg" />
         </motion.div>
         <div className="incoming-title">PIN Request</div>
       </div>

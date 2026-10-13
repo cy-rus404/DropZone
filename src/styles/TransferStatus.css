@@ -36,6 +36,9 @@
   padding: 2px 7px;
   border-radius: 20px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .transfer-direction.sending {
@@ -66,7 +69,13 @@
   flex-shrink: 0;
   min-width: 28px;
   text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
+
+.ts-done-icon { color: var(--success); }
+.ts-err-icon  { color: var(--error); }
 
 /* Progress bar */
 .progress-track {

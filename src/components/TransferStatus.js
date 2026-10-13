@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { ArrowUp, ArrowDown, CheckCircle, XCircle } from 'lucide-react';
 import '../styles/TransferStatus.css';
 
 /**
@@ -27,8 +28,8 @@ function TransferItem({ transfer }) {
   const isComplete = status === 'complete';
   const isError = status === 'error';
 
-  const label = direction === 'sending' ? '↑ Sending' : '↓ Receiving';
-  const labelClass = direction === 'sending' ? 'sending' : 'receiving';
+  const isSending = direction === 'sending';
+  const labelClass = isSending ? 'sending' : 'receiving';
 
   return (
     <motion.div
@@ -39,12 +40,20 @@ function TransferItem({ transfer }) {
       transition={{ type: 'spring', stiffness: 380, damping: 28 }}
     >
       <div className="transfer-info">
-        <span className={`transfer-direction ${labelClass}`}>{label}</span>
+        <span className={`transfer-direction ${labelClass}`}>
+          {isSending
+            ? <><ArrowUp size={9} strokeWidth={3} /> Sending</>
+            : <><ArrowDown size={9} strokeWidth={3} /> Receiving</>}
+        </span>
         <span className="transfer-filename" title={filename}>
           {filename}
         </span>
         <span className="transfer-percent">
-          {isComplete ? '✓' : isError ? '✗' : `${percent}%`}
+          {isComplete
+            ? <CheckCircle size={11} strokeWidth={2.5} className="ts-done-icon" />
+            : isError
+            ? <XCircle size={11} strokeWidth={2.5} className="ts-err-icon" />
+            : `${percent}%`}
         </span>
       </div>
 
@@ -52,7 +61,7 @@ function TransferItem({ transfer }) {
         <motion.div
           className={`progress-fill ${isComplete ? 'complete' : isError ? 'error' : ''}`}
           initial={{ width: 0 }}
-          animate={{ width: `${isComplete ? 100 : isError ? percent : percent}%` }}
+          animate={{ width: `${isComplete ? 100 : percent}%` }}
           transition={{ ease: 'easeOut', duration: 0.3 }}
         />
         {/* Shimmer effect while active */}

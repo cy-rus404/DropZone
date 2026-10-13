@@ -1,13 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Folder, RefreshCw, Pencil, X } from 'lucide-react';
+import { AVATAR_LIST, DEFAULT_AVATAR, AvatarIcon } from '../avatarIcons';
 import '../styles/Settings.css';
-
-const AVATARS = [
-  '🐶','🐱','🦊','🐼','🐨','🦁',
-  '🐯','🐸','🐧','🦋','🦄','🐲',
-  '👾','🤖','👻','🎃','⚡','🔥',
-  '🌊','🌈','🍕','🎮','🚀','💎',
-];
 
 /**
  * Settings
@@ -16,11 +11,11 @@ const AVATARS = [
  *
  * Props:
  *   deviceName        {string}   Current device display name
- *   avatar            {string}   Emoji avatar for this device
+ *   avatar            {string}   Avatar icon ID, e.g. "Zap"
  *   pinEnabled        {boolean}  Whether PIN protection is active
  *   pin               {string}   6-digit PIN string, e.g. '482193'
  *   onTogglePin       {fn}       Called with (boolean) when toggle flips
- *   onRefreshPin      {fn}       Called when 🔄 is pressed
+ *   onRefreshPin      {fn}       Called when refresh is pressed
  *   saveFolder        {string}   Absolute path or null/empty
  *   onPickSaveFolder  {fn}       Called when 'Browse…' is clicked
  *   onClearSaveFolder {fn}       Called when 'Clear' is clicked
@@ -42,12 +37,12 @@ export default function Settings({
 }) {
   const [editingProfile, setEditingProfile] = useState(false);
   const [draftName, setDraftName]           = useState(deviceName || '');
-  const [draftAvatar, setDraftAvatar]       = useState(avatar || '🤖');
+  const [draftAvatar, setDraftAvatar]       = useState(avatar || DEFAULT_AVATAR);
   const [nameError, setNameError]           = useState('');
 
   const handleOpenEdit = () => {
     setDraftName(deviceName || '');
-    setDraftAvatar(avatar || '🤖');
+    setDraftAvatar(avatar || DEFAULT_AVATAR);
     setNameError('');
     setEditingProfile(true);
   };
@@ -59,15 +54,14 @@ export default function Settings({
     onSaveProfile(trimmed, draftAvatar);
     setEditingProfile(false);
   };
+
   // Format the PIN string into spaced digits: '482193' → '4 8 2 1 9 3'
   const formattedPin = pin
     ? String(pin).split('').join(' ')
     : '— — — — — —';
 
   // Truncate long paths for display
-  const displayPath = saveFolder
-    ? truncatePath(saveFolder, 34)
-    : null;
+  const displayPath = saveFolder ? truncatePath(saveFolder, 34) : null;
 
   return (
     <motion.div
@@ -87,8 +81,8 @@ export default function Settings({
           title="Edit profile"
           aria-label="Edit avatar and name"
         >
-          {avatar || '💻'}
-          <span className="settings-avatar-edit-hint">✏️</span>
+          <AvatarIcon id={avatar || DEFAULT_AVATAR} size={16} />
+          <span className="settings-avatar-edit-hint"><Pencil size={9} /></span>
         </motion.button>
         <div className="settings-header-info">
           <span className="settings-device-name">{deviceName || 'This Device'}</span>
@@ -102,7 +96,7 @@ export default function Settings({
           aria-label="Close settings"
           title="Close"
         >
-          ✕
+          <X size={13} strokeWidth={2.5} />
         </button>
       </div>
 
@@ -121,18 +115,18 @@ export default function Settings({
             <div className="settings-section">
               <div className="settings-section-label">Edit Profile</div>
 
-              {/* Avatar grid */}
+              {/* Icon avatar grid */}
               <div className="settings-avatar-grid">
-                {AVATARS.map((emoji) => (
+                {AVATAR_LIST.map((id) => (
                   <button
-                    key={emoji}
+                    key={id}
                     type="button"
-                    className={`settings-avatar-option${draftAvatar === emoji ? ' selected' : ''}`}
-                    onClick={() => setDraftAvatar(emoji)}
-                    aria-label={`Select avatar ${emoji}`}
-                    aria-pressed={draftAvatar === emoji}
+                    className={`settings-avatar-option${draftAvatar === id ? ' selected' : ''}`}
+                    onClick={() => setDraftAvatar(id)}
+                    aria-label={`Select avatar ${id}`}
+                    aria-pressed={draftAvatar === id}
                   >
-                    {emoji}
+                    <AvatarIcon id={id} size={15} />
                   </button>
                 ))}
               </div>
@@ -177,11 +171,12 @@ export default function Settings({
         <div className="settings-section-label">Default Save Folder</div>
 
         <div className="settings-folder-row">
-          {/* Current path or placeholder */}
           <div className="settings-folder-path" title={saveFolder || undefined}>
             {displayPath ? (
               <>
-                <span className="settings-folder-icon" aria-hidden="true">📁</span>
+                <span className="settings-folder-icon" aria-hidden="true">
+                  <Folder size={12} />
+                </span>
                 <span className="settings-folder-text">{displayPath}</span>
               </>
             ) : (
@@ -189,7 +184,6 @@ export default function Settings({
             )}
           </div>
 
-          {/* Action buttons */}
           <div className="settings-folder-actions">
             <button
               className="settings-btn-secondary"
@@ -230,8 +224,6 @@ export default function Settings({
       <section className="settings-section" aria-label="PIN protection">
         <div className="settings-toggle-row">
           <span className="settings-section-label">Require PIN from senders</span>
-
-          {/* CSS-only toggle switch */}
           <button
             role="switch"
             aria-checked={pinEnabled}
@@ -253,7 +245,6 @@ export default function Settings({
               transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
               style={{ overflow: 'hidden' }}
             >
-              {/* PIN digits + refresh */}
               <div className="settings-pin-row">
                 <span
                   className="settings-pin-digits"
@@ -269,10 +260,9 @@ export default function Settings({
                   aria-label="Generate new PIN"
                   title="New PIN"
                 >
-                  🔄
+                  <RefreshCw size={13} strokeWidth={2} />
                 </motion.button>
               </div>
-
               <p className="settings-pin-hint">
                 Share this PIN with anyone who wants to send you a file
               </p>
@@ -299,15 +289,9 @@ export default function Settings({
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Truncate a file-system path from the right, preserving the tail.
- * e.g. '/Users/alice/Documents/Work/Projects' → '…/Work/Projects'
- */
 function truncatePath(p, maxLen) {
   if (!p) return '';
   if (p.length <= maxLen) return p;
-  // Try to keep the last two segments
   const parts = p.replace(/\\/g, '/').split('/').filter(Boolean);
   let result = p;
   while (result.length > maxLen && parts.length > 1) {

@@ -44,6 +44,9 @@
   font-size: 13px;
   line-height: 1;
   opacity: 0.7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .notch-dot-badge {
@@ -64,17 +67,18 @@
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
   cursor: pointer;
-  font-size: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   transition: background 0.1s ease;
   padding: 0;
+  color: var(--text-secondary);
 }
 
 .settings-gear-btn:hover {
   background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
 }
 
 /* ── Expanded top bar ─────────────────────────────── */
@@ -99,6 +103,14 @@
   font-size: 18px;
   line-height: 1;
   filter: drop-shadow(0 0 5px var(--accent-glow));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* SVG icon in logo position */
+.notch-logo-icon {
+  color: var(--accent);
 }
 
 .device-info {
@@ -166,7 +178,13 @@
   overflow: hidden;
 }
 
-.file-pill-icon { font-size: 14px; flex-shrink: 0; }
+.file-pill-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
 
 .file-pill-name {
   font-size: 10px;
@@ -295,6 +313,7 @@
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.07);
   flex-shrink: 0;
+  color: var(--text-secondary);
 }
 
 .peer-name {
@@ -316,7 +335,8 @@
 }
 
 .send-chevron {
-  font-size: 12px;
+  display: flex;
+  align-items: center;
   color: var(--accent);
   opacity: 0.7;
   flex-shrink: 0;
@@ -330,23 +350,26 @@
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
   cursor: pointer;
-  font-size: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   transition: background 0.1s ease;
+  color: var(--text-muted);
+  padding: 0;
 }
 
 .ping-btn:hover {
   background: rgba(251, 191, 36, 0.12);
   border-color: rgba(251, 191, 36, 0.3);
+  color: var(--warning);
 }
 
 .ping-btn.pinging {
   background: rgba(251, 191, 36, 0.18);
   border-color: rgba(251, 191, 36, 0.45);
   box-shadow: 0 0 8px rgba(251, 191, 36, 0.25);
+  color: var(--warning);
 }
 
 /* ── PIN entry panel (inside pill, sender side) ───────── */
@@ -363,7 +386,13 @@
   gap: 10px;
 }
 
-.pin-panel-icon { font-size: 22px; flex-shrink: 0; }
+.pin-panel-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
 
 .pin-panel-title {
   font-size: 12px;
@@ -440,7 +469,11 @@
   font-size: 11px;
 }
 
-.no-peers span { font-size: 24px; margin-bottom: 3px; }
+.no-peers-icon {
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+
 .no-peers-hint { font-size: 10px; color: var(--text-muted); }
 
 /* Footer */
@@ -491,9 +524,12 @@
 .xfr-badge {
   font-size: 9px;
   font-weight: 700;
-  padding: 2px 6px;
+  padding: 3px 6px;
   border-radius: 16px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .xfr-badge.send {
@@ -524,7 +560,14 @@
   min-width: 26px;
   text-align: right;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
+
+/* Lucide icons inside xfr-pct */
+.xfr-done-icon { color: var(--success); }
+.xfr-err-icon  { color: var(--error); }
 
 .xfr-track {
   position: relative;
